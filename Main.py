@@ -8,7 +8,6 @@ from os import path
 from discord.ext import commands
 
 bot = commands.Bot(command_prefix='$')
-dccl = discord.Client()
 
 class date:
     def load():
@@ -40,6 +39,8 @@ class log:
     async def write(msg,md):
         if md == 'cmdget':
             logd = date.load() + '명령어 수신 [' + msg.author.name + '] : ' + msg.content
+        elif md == 'slogin':
+            logd = date.load() + '로그인 : {0}'.format(msg.user)
         elif md == 'sndmsg':
             logd = date.load() + '메시지 전송 : ' + msg.content
         elif md == 'sutdwn':
@@ -50,23 +51,26 @@ class log:
 class MyClient(discord.Client):
     async def on_ready(self):
         # 로그인 확인
-        logd = date.load() + '로그인 : {0}'.format(self.user)
-        await log.send(logd + "\n")
-        print(logd)
+        await log.write(self,'slogin')
+        game = discord.Game("발전")
+        await client.change_presence(status=discord.Status.idle, activity=game)
 
-@dccl.event
+client = MyClient()
+
+@client.event
 async def on_message(self, message):
     # 봇이 전송한 메시지 로깅
     if message.author == client.user:
         await log.write(message,'sndmsg')
         return
-    # 이하코드
-
-@bot.command
+    
+@bot.command()
 async def test(ctx):
     await log.write(message,'cmdget')
     await message.channel.send('Test Complete')
     return
+
+@bot.command()
 async def stop(ctx):
     await log.write(message,'cmdget')
     await message.channel.send('종료 시작.')
@@ -75,5 +79,4 @@ async def stop(ctx):
     return
 
 token = config.token
-client = MyClient()
 client.run(token)
