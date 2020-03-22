@@ -3,7 +3,12 @@ import discord
 import os.path
 import datetime
 import aiofiles
+import config
 from os import path
+from discord.ext import commands
+
+bot = commands.Bot(command_prefix='$')
+dccl = discord.Client()
 
 class date:
     def load():
@@ -20,7 +25,7 @@ class File:
             await f.write(data)
         return
     async def get(file):
-        async with aiofiles.open(file + ".kbd", mode='r', encoding='UTF8') as f:
+        async with open(file + ".kbd", mode='r', encoding='UTF8') as f:
             rtd = await f.read()
         return rtd
 
@@ -41,7 +46,7 @@ class log:
             logd = date.load() + '시스템 종료.'
         print(logd)
         await log.send(logd + "\n")
-        
+
 class MyClient(discord.Client):
     async def on_ready(self):
         # 로그인 확인
@@ -49,22 +54,26 @@ class MyClient(discord.Client):
         await log.send(logd + "\n")
         print(logd)
 
-    async def on_message(self, message):
-        # 봇이 전송한 메시지 로깅
-        if message.author == client.user:
-            await log.write(message,'sndmsg')
-            return
-        # 이하코드
-        if message.content.startswith('*Test'):
-            await log.write(message,'cmdget')
-            await message.channel.send('Test Complete')
-            return
-        if message.content.startswith('*stop'):
-            await log.write(message,'cmdget')
-            await message.channel.send('종료 시작.')
-            await log.write(message,'sutdwn')
-            await client.close()
-            return
+@dccl.event
+async def on_message(self, message):
+    # 봇이 전송한 메시지 로깅
+    if message.author == client.user:
+        await log.write(message,'sndmsg')
+        return
+    # 이하코드
 
+@bot.command
+async def test(ctx):
+    await log.write(message,'cmdget')
+    await message.channel.send('Test Complete')
+    return
+async def stop(ctx):
+    await log.write(message,'cmdget')
+    await message.channel.send('종료 시작.')
+    await log.write(message,'sutdwn')
+    await client.close()
+    return
+
+token = config.token
 client = MyClient()
-client.run(File.get('token'))
+client.run(token)
