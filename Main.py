@@ -67,4 +67,4 @@ class MyClient(discord.Client):
             return
 
 client = MyClient()
-client.run()
+client.run(File.get('token'))
