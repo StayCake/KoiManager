@@ -25,7 +25,7 @@ class File:
             await f.write(data)
         return
     async def get(file):
-        async with open(file + ".kbd", mode='r', encoding='UTF8') as f:
+        async with aiofiles.open(file + ".kbd", mode='r', encoding='UTF8') as f:
             rtd = await f.read()
         return rtd
 
