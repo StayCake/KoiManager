@@ -40,5 +40,7 @@ class log:
             logd = date.load() + '메시지 전송 : ' + msg.content
         elif md == 'sutdwn':
             logd = date.load() + '시스템 종료.'
+        elif md == 'cmddnd':
+            logd = date.load() + '권한 부족 [' + msg.author.name + '] : ' + msg.content
         print(logd)
         await log.send(logd + "\n")
