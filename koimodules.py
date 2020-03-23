@@ -5,9 +5,18 @@ import aiofiles
 from os import path
 
 class date:
+    def datefm():
+        dt = datetime.datetime.now()
+        return dt.strftime("%Y-%m-%d")
     def load():
         dt = datetime.datetime.now()
         return dt.strftime("%Y년 %m월 %d일 | %H시 %M분 %S초 ) ")
+
+class daily:
+    async def check(message,self):
+        if not path.exists("log.kbd"):
+        else:
+            checkdata = async File.get('UserDB/daily/' + message.author.id)
 
 class File:
     async def write(file, data):

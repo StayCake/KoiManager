@@ -1,6 +1,6 @@
 import discord
 import config
-from koimodules import log
+from koimodules import *
 
 # 커맨드 파일
 class koicmd():
@@ -23,4 +23,9 @@ class koicmd():
     async def myid(message,self):
         await log.write(message,'cmdget')
         await message.channel.send('당신의 ID코드 : ' + str(message.author.id))
+        return
+
+    async def 출석(message,self):
+        await log.write(message,'cmdget')
+        await daily.check(message,self)
         return
