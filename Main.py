@@ -27,6 +27,7 @@ class MyClient(discord.Client):
 
             # 커맨드 유효 확인
             if cmd in dir(koicmd):
+                await log.write(message,'cmdget')
                 await getattr(koicmd, cmd)(message,self)
             else:
                 return
