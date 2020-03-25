@@ -3,6 +3,7 @@ import datetime
 import aiofiles
 import random
 import discord
+import config
 
 from os import path
 
@@ -52,13 +53,14 @@ class daily:
 
         global serverdate
         global serverrank
-        global serverdata
-        if not path.exists(os.getcwd() + '\\UserDB\\__server__.kbd'):
-            serverdata = 'oneday,0'
+        if await serverDB.read('checkdate') != None:
+            serverdate = await serverDB.read('checkdate')
+            serverrk = await serverDB.read('checkrank')
+            serverrank = int(serverrk)
         else:
-            serverdata = await File.get('\\UserDB\\__server__')
-        serverdate, serverrk = serverdata.split(',')
-        serverrank = int(serverrk)
+            serverrank = 0
+            serverdate = 'oneday'
+            
         if serverdate != date.datefm():
             serverrank = 0
             
@@ -79,12 +81,14 @@ class daily:
             embed.add_field(name="전체 순위", value=str(serverrank + 1) + '위', inline=True)
             if (serverrank + 1) == 1:
                 await userDB.set(message,'money',str(fmoney + 100))
-                await File.write('\\UserDB\\__server__',date.datefm() + ',' + str(serverrank + 1))
+                await serverDB.set('checkdate',date.datefm())
+                await serverDB.set('checkrank',set(serverrank + 1))
                 embed.add_field(name="전체 1위!", value='100원 추가 획득', inline=True)
                 embed.add_field(name="총 소지금", value=str(fmoney + 100) + '원', inline=True)
             else:
                 await userDB.set(message,'money',str(fmoney))
-                await File.write('\\UserDB\\__server__',date.datefm() + ',' + str(serverrank + 1))
+                await serverDB.set('checkdate',date.datefm())
+                await serverDB.set('checkrank',set(serverrank + 1))
                 embed.add_field(name="총 소지금", value=str(fmoney), inline=True)
             await message.channel.send(embed=embed)
         else:
