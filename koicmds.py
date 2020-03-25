@@ -31,8 +31,94 @@ class koicmd():
         try:
             setprefix = message.content.split(' ')[1]
         except IndexError:
-            await guildDB.set(message,'prefix',config.prefix)
-            await message.channel.send('본 서버의 명령 칭호가 초기화 되었습니다.')
+            await prefixer.reset(message)
         else:
-            await guildDB.set(message,'prefix',setprefix)
-            await message.channel.send('이제 본 서버의 명령 칭호는 `' + setprefix + '`입니다.')
+            await prefixer.set(message,setprefix)
+
+    async def 비트코인(message,self):
+        global excepts
+        excepts = False
+        try:
+            arg1 = message.content.split(' ')[1]
+        except IndexError:
+            excepts = True
+
+        if excepts or arg1 == '명령어' and arg1 != '구매' and arg1 != '개수' and arg1 != '존버' and arg1 != '판매' and arg1 != '시세':
+            prefix = await prefixer.check(message)
+            embed = discord.Embed(title="비트코인 명령어", description="비트코인 : 시세 1원 부터 1천만원 까지", color=0x62c1cc)
+            embed.set_footer(text=message.author.name + "님이 실행함 | 63C 매니저")
+            embed.add_field(name=prefix + "비트코인 구매 <수량>", value='수량 만큼 삽니다.', inline=True)
+            embed.add_field(name=prefix + "비트코인 존버", value='존버해서 시세를 변동합니다.', inline=True)
+            embed.add_field(name=prefix + "비트코인 판매 <수량>", value='수량 만큼 팝니다.', inline=True)
+            embed.add_field(name=prefix + "비트코인 시세", value='현재 시세를 봅니다.', inline=True)
+            embed.add_field(name=prefix + "비트코인 개수", value='현재 가진 수량을 봅니다.', inline=True)
+            await message.channel.send(embed=embed)
+        else:
+            try:
+                arg2 = message.content.split(' ')[2]
+            except IndexError:
+                if arg1 == '존버':
+                    await bitcoin.stay(message)
+                if arg1 == '시세':
+                    await bitcoin.value(message)
+                if arg1 == '수량':
+                    await bitcoin.amount(message)
+                if arg1 == '판매':
+                    await message.channel.send('명령어 구문이 올바르지 않습니다.')
+                if arg1 == '구매':
+                    await message.channel.send('명령어 구문이 올바르지 않습니다.')
+            else:
+                if arg1 == '판매':
+                    await bitcoin.sell(message,arg2)
+                if arg1 == '구매':
+                    await bitcoin.buy(message,arg2)
+                if arg1 == '존버':
+                    await bitcoin.stay(message)
+                if arg1 == '시세':
+                    await bitcoin.value(message)
+                if arg1 == '수량':
+                    await bitcoin.amount(message)
+                    
+    async def 코이코인(message,self):
+        global excepts
+        excepts = False
+        try:
+            arg1 = message.content.split(' ')[1]
+        except IndexError:
+            excepts = True
+
+        if excepts or arg1 == '명령어' and arg1 != '구매' and arg1 != '개수' and arg1 != '존버' and arg1 != '판매' and arg1 != '시세':
+            prefix = await prefixer.check(message)
+            embed = discord.Embed(title="코이코인 명령어", description="코이코인 : 시세 1원 부터 514원 까지", color=0x62c1cc)
+            embed.set_footer(text=message.author.name + "님이 실행함 | 63C 매니저")
+            embed.add_field(name=prefix + "코이코인 구매 <수량>", value='수량 만큼 삽니다.', inline=True)
+            embed.add_field(name=prefix + "코이코인 존버", value='존버해서 시세를 변동합니다.', inline=True)
+            embed.add_field(name=prefix + "코이코인 판매 <수량>", value='수량 만큼 팝니다.', inline=True)
+            embed.add_field(name=prefix + "코이코인 시세", value='현재 시세를 봅니다.', inline=True)
+            embed.add_field(name=prefix + "코이코인 개수", value='현재 가진 수량을 봅니다.', inline=True)
+            await message.channel.send(embed=embed)
+        else:
+            try:
+                arg2 = message.content.split(' ')[2]
+            except IndexError:
+                if arg1 == '존버':
+                    await koicoin.stay(message)
+                if arg1 == '시세':
+                    await koicoin.value(message)
+                if arg1 == '수량':
+                    await koicoin.amount(message)
+                if arg1 == '판매':
+                    await message.channel.send('명령어 구문이 올바르지 않습니다.')
+                if arg1 == '구매':
+                    await message.channel.send('명령어 구문이 올바르지 않습니다.')
+            else:
+                if arg1 == '판매':
+                    await koicoin.sell(message,arg2)
+                if arg1 == '구매':
+                    await koicoin.buy(message,arg2)
+                if arg1 == '존버':
+                    await koicoin.stay(message)
+                if arg1 == '시세':
+                    await koicoin.value(message)
+                if arg1 == '수량':
+                    await koicoin.amount(message)

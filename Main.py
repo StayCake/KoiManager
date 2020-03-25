@@ -3,7 +3,7 @@ import discord
 import config
 from koicmds import koicmd
 from koimodules import log
-from koimodules import guildDB
+from koimodules import prefixer
 
 class MyClient(discord.Client):
     async def on_ready(self):
@@ -21,12 +21,7 @@ class MyClient(discord.Client):
             await log.write(message,'sndmsg')
             return
 
-        # 서버 내 설정 접미사 확인
-        if await guildDB.read(message,'prefix') != None:
-            prefix = await guildDB.read(message,'prefix')
-        else:
-            prefix = config.prefix
-            
+        prefix = await prefixer.check(message)
             
         # 봇 명령어 접미사 감지
         if message.content.startswith(prefix):
