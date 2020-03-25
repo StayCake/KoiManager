@@ -122,3 +122,14 @@ class koicmd():
                     await koicoin.value(message)
                 if arg1 == '수량':
                     await koicoin.amount(message)
+                    
+    async def 지갑(message,self):
+        embed = discord.Embed(title=message.author.name + "님", description="코이코인, 비트코인, 잔고를 나열합니다.", color=0x62c1cc)
+        if await userDB.read(message,'koicoin') != None:
+            embed.add_field(name="코이코인", value=await userDB.read(message,'koicoin') + '개', inline=True)
+        if await userDB.read(message,'bitcoin') != None:
+            embed.add_field(name="비트코인", value=await userDB.read(message,'bitcoin') + '개', inline=True)
+        if await userDB.read(message,'money') != None:
+            embed.add_field(name="소지금", value=await userDB.read(message,'money') + '원', inline=True)
+        embed.add_field(name="아무것도 뜨지 않나요?", value='셋 중 하나 이상을 소지하는지 확인하세요.', inline=True)
+        await message.channel.send(embed=embed)

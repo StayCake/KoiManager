@@ -256,11 +256,11 @@ class bitcoin:
         nowvalstr = str(nowvalue)
         await serverDB.set('bitcoin',nowvalstr)
         if int(befvalue) > nowvalue:
-            await message.channel.send(':arrow_heading_down: 하락 했습니다. 현재가 : ' + nowvalstr + '원 :arrow_heading_down:')
+            await message.channel.send(':arrow_heading_down: 비트코인이 하락 했습니다. 현재가 : ' + nowvalstr + '원 :arrow_heading_down:')
         elif int(befvalue) == nowvalue:
-            await message.channel.send(':arrow_right: 변화가 없습니다. 현재가 : ' + nowvalstr + '원 :arrow_right:')
+            await message.channel.send(':arrow_right: 비트코인이 변화가 없습니다. 현재가 : ' + nowvalstr + '원 :arrow_right:')
         elif int(befvalue) < nowvalue:
-            await message.channel.send(':arrow_heading_up: 상승 했습니다. 현재가 : ' + nowvalstr + '원 :arrow_heading_up:')
+            await message.channel.send(':arrow_heading_up: 비트코인이 상승 했습니다. 현재가 : ' + nowvalstr + '원 :arrow_heading_up:')
     async def buy(message,amount):
         value = await serverDB.read('bitcoin')
         if value == None:
@@ -284,7 +284,7 @@ class bitcoin:
                     else:
                         totalamount = int(haveamount) + int(amount)
                         await userDB.set(message,'bitcoin',str(totalamount))
-                    embed = discord.Embed(title="구매 완료", description="코인이 구매 되었습니다.", color=0x62c1cc)
+                    embed = discord.Embed(title="구매 완료", description="비트코인이 구매 되었습니다.", color=0x62c1cc)
                     embed.set_footer(text=message.author.name + "님이 실행함 | 63C 매니저")
                     embed.add_field(name="구매 일자", value=str(date.datefm()), inline=True)
                     embed.add_field(name="결재 금액", value=str(total) + '원', inline=True)
@@ -311,7 +311,7 @@ class bitcoin:
                     await userDB.set(message,'money',str(finalmoney))
                     totalamount = int(haveamount) - int(amount)
                     await userDB.set(message,'bitcoin',str(totalamount))
-                    embed = discord.Embed(title="판매 완료", description="코인이 판매 되었습니다.", color=0x62c1cc)
+                    embed = discord.Embed(title="판매 완료", description="비트코인이 판매 되었습니다.", color=0x62c1cc)
                     embed.set_footer(text=message.author.name + "님이 실행함 | 63C 매니저")
                     embed.add_field(name="판매 일자", value=str(date.datefm()), inline=True)
                     embed.add_field(name="판매 금액", value=str(total) + '원', inline=True)
@@ -324,13 +324,13 @@ class bitcoin:
         if value == None:
             await message.channel.send('비트코인이 생기지 않았습니다. 존버부터 하셔야 합니다.')
         else:
-            await message.channel.send('현재 시세 : 개당 ' + value + '원')
+            await message.channel.send('비트코인 현재 시세 : 개당 ' + value + '원')
     async def amount(message):
         haveamount = await userDB.read(message,'bitcoin')
         if haveamount == None:
             await message.channel.send('소지하신 비트코인이 없습니다.')
         else:
-            await message.channel.send('현재 수량 : ' + haveamount + '개')
+            await message.channel.send('비트코인 현재 수량 : ' + haveamount + '개')
             
 class koicoin:
     async def stay(message):
@@ -341,11 +341,11 @@ class koicoin:
         nowvalstr = str(nowvalue)
         await serverDB.set('koicoin',nowvalstr)
         if int(befvalue) > nowvalue:
-            await message.channel.send(':arrow_heading_down: 하락 했습니다. 현재가 : ' + nowvalstr + '원 :arrow_heading_down:')
+            await message.channel.send(':arrow_heading_down: 코이코인이 하락 했습니다. 현재가 : ' + nowvalstr + '원 :arrow_heading_down:')
         elif int(befvalue) == nowvalue:
-            await message.channel.send(':arrow_right: 변화가 없습니다. 현재가 : ' + nowvalstr + '원 :arrow_right:')
+            await message.channel.send(':arrow_right: 코이코인이 변화가 없습니다. 현재가 : ' + nowvalstr + '원 :arrow_right:')
         elif int(befvalue) < nowvalue:
-            await message.channel.send(':arrow_heading_up: 상승 했습니다. 현재가 : ' + nowvalstr + '원 :arrow_heading_up:')
+            await message.channel.send(':arrow_heading_up: 코이코인이 상승 했습니다. 현재가 : ' + nowvalstr + '원 :arrow_heading_up:')
     async def buy(message,amount):
         value = await serverDB.read('koicoin')
         if value == None:
@@ -369,7 +369,7 @@ class koicoin:
                     else:
                         totalamount = int(haveamount) + int(amount)
                         await userDB.set(message,'koicoin',str(totalamount))
-                    embed = discord.Embed(title="구매 완료", description="코인이 구매 되었습니다.", color=0x62c1cc)
+                    embed = discord.Embed(title="구매 완료", description="코이코인이 구매 되었습니다.", color=0x62c1cc)
                     embed.set_footer(text=message.author.name + "님이 실행함 | 63C 매니저")
                     embed.add_field(name="구매 일자", value=str(date.datefm()), inline=True)
                     embed.add_field(name="결재 금액", value=str(total) + '원', inline=True)
@@ -396,7 +396,7 @@ class koicoin:
                     await userDB.set(message,'money',str(finalmoney))
                     totalamount = int(haveamount) - int(amount)
                     await userDB.set(message,'koicoin',str(totalamount))
-                    embed = discord.Embed(title="판매 완료", description="코인이 판매 되었습니다.", color=0x62c1cc)
+                    embed = discord.Embed(title="판매 완료", description="코이코인이 판매 되었습니다.", color=0x62c1cc)
                     embed.set_footer(text=message.author.name + "님이 실행함 | 63C 매니저")
                     embed.add_field(name="판매 일자", value=str(date.datefm()), inline=True)
                     embed.add_field(name="판매 금액", value=str(total) + '원', inline=True)
@@ -409,13 +409,13 @@ class koicoin:
         if value == None:
             await message.channel.send('코이코인이 생기지 않았습니다. 존버부터 하셔야 합니다.')
         else:
-            await message.channel.send('현재 시세 : 개당 ' + value + '원')
+            await message.channel.send('코이코인 현재 시세 : 개당 ' + value + '원')
     async def amount(message):
         haveamount = await userDB.read(message,'koicoin')
         if haveamount == None:
             await message.channel.send('소지하신 코이코인이 없습니다.')
         else:
-            await message.channel.send('현재 수량 : ' + haveamount + '개')
+            await message.channel.send('코이코인 현재 수량 : ' + haveamount + '개')
 
 class prefixer:
     async def check(message):
