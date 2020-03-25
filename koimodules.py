@@ -347,36 +347,47 @@ class koicoin:
         elif int(befvalue) < nowvalue:
             await message.channel.send(':arrow_heading_up: 코이코인이 상승 했습니다. 현재가 : ' + nowvalstr + '원 :arrow_heading_up:')
     async def buy(message,amount):
-        value = await serverDB.read('koicoin')
-        if value == None:
-            await message.channel.send('코이코인이 생기지 않았습니다. 존버부터 하셔야 합니다.')
-        else:
-            mymoney = await userDB.read(message,'money')
-            total = int(value) * int(amount)
-            if mymoney == None:
-                await message.channel.send('소지금이 부족합니다.')
+        if int(amount) <= 500:
+            value = await serverDB.read('koicoin')
+            if value == None:
+                await message.channel.send('코이코인이 생기지 않았습니다. 존버부터 하셔야 합니다.')
             else:
-                hmoney = int(mymoney)
-                if hmoney < total:
+                mymoney = await userDB.read(message,'money')
+                total = int(value) * int(amount)
+                if mymoney == None:
                     await message.channel.send('소지금이 부족합니다.')
                 else:
-                    finalmoney = hmoney - total
-                    await userDB.set(message,'money',str(finalmoney))
-                    haveamount = await userDB.read(message,'koicoin')
-                    if haveamount == None:
-                        totalamount = amount
-                        await userDB.set(message,'koicoin',amount)
+                    hmoney = int(mymoney)
+                    if hmoney < total:
+                        await message.channel.send('소지금이 부족합니다.')
                     else:
-                        totalamount = int(haveamount) + int(amount)
-                        await userDB.set(message,'koicoin',str(totalamount))
-                    embed = discord.Embed(title="구매 완료", description="코이코인이 구매 되었습니다.", color=0x62c1cc)
-                    embed.set_footer(text=message.author.name + "님이 실행함 | 63C 매니저")
-                    embed.add_field(name="구매 일자", value=str(date.datefm()), inline=True)
-                    embed.add_field(name="결재 금액", value=str(total) + '원', inline=True)
-                    embed.add_field(name="결재 수량", value=amount + '개', inline=True)
-                    embed.add_field(name="현재 잔고", value=str(finalmoney) + '원', inline=True)
-                    embed.add_field(name="현재 잔량", value=str(totalamount) + '개', inline=True)
-                    await message.channel.send(embed=embed)
+                        finalmoney = hmoney - total
+                        haveamount = await userDB.read(message,'koicoin')
+                        if haveamount == None:
+                            totalamount = amount
+                            await userDB.set(message,'koicoin',amount)
+                            complete = True
+                        else:
+                            totalamount = int(haveamount) + int(amount)
+                            if totalamount <= 500:
+                                await userDB.set(message,'koicoin',str(totalamount))
+                                complete = True
+                            else:
+                                complete = False
+                        if complete:
+                            await userDB.set(message,'money',str(finalmoney))
+                            embed = discord.Embed(title="구매 완료", description="코이코인이 구매 되었습니다.", color=0x62c1cc)
+                            embed.set_footer(text=message.author.name + "님이 실행함 | 63C 매니저")
+                            embed.add_field(name="구매 일자", value=str(date.datefm()), inline=True)
+                            embed.add_field(name="결재 금액", value=str(total) + '원', inline=True)
+                            embed.add_field(name="결재 수량", value=amount + '개', inline=True)
+                            embed.add_field(name="현재 잔고", value=str(finalmoney) + '원', inline=True)
+                            embed.add_field(name="현재 잔량", value=str(totalamount) + '개', inline=True)
+                            await message.channel.send(embed=embed)
+                        else:
+                            await message.channel.send('보유량은 500개를 넘을 수 없습니다.')
+        else:
+            await message.channel.send('보유량은 500개를 넘을 수 없습니다.')
     async def sell(message,amount):
         value = await serverDB.read('koicoin')
         if value == None:
