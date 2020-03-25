@@ -82,13 +82,13 @@ class daily:
             if (serverrank + 1) == 1:
                 await userDB.set(message,'money',str(fmoney + 100))
                 await serverDB.set('checkdate',date.datefm())
-                await serverDB.set('checkrank',set(serverrank + 1))
+                await serverDB.set('checkrank',str(serverrank + 1))
                 embed.add_field(name="전체 1위!", value='100원 추가 획득', inline=True)
                 embed.add_field(name="총 소지금", value=str(fmoney + 100) + '원', inline=True)
             else:
                 await userDB.set(message,'money',str(fmoney))
                 await serverDB.set('checkdate',date.datefm())
-                await serverDB.set('checkrank',set(serverrank + 1))
+                await serverDB.set('checkrank',str(serverrank + 1))
                 embed.add_field(name="총 소지금", value=str(fmoney), inline=True)
             await message.channel.send(embed=embed)
         else:
