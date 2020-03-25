@@ -25,6 +25,13 @@ class daily:
                 check = 'did'
             else:
                 check = 'tmr'
+        elif await userDB.read(message,'checkdate') != None and await guildDB.read(message,'checkdate') == None:
+            ckdate = await userDB.read(message,'checkdate')
+            rankstr = await userDB.read(message,'checkrank')
+            if str(ckdate) == date.datefm():
+                check = 'd2d'
+            else:
+                check = 'ngd'
         elif await userDB.read(message,'checkdate') == None and await guildDB.read(message,'checkdate') != None:
             check = 'nud'
         else:
@@ -34,7 +41,7 @@ class daily:
         global guildrank
         guilddate = ''
         guildrank = 0
-        if check != 'ngd':
+        if check != 'ngd' and check != 'd2d':
             guilddate = await guildDB.read(message, 'checkdate')
             guildrank = int(await guildDB.read(message, 'checkrank'))
         
@@ -54,7 +61,7 @@ class daily:
         if serverdate != date.datefm():
             serverrank = 0
             
-        if check != 'did':
+        if check != 'did' and check != 'd2d':
             m = await userDB.read(message, 'money')
             if m != None:
                 fmoney = int(m) + 150
@@ -94,7 +101,7 @@ class userDB:
                 dtc = datas.split('\n')[d]
                 dtf, dtb = dtc.split(':')
                 if dtf == idx:
-                    datas.replace(dtc,dtb + ':' + value)
+                    datas = datas.replace(dtc,dtf + ':' + value)
             await File.write('\\UserDB\\' + str(message.author.id),datas)
         else:
             await File.append('\\UserDB\\' + str(message.author.id),'\n' + idx + ':' + value)
@@ -130,7 +137,7 @@ class guildDB:
                 dtc = datas.split('\n')[d]
                 dtf, dtb = dtc.split(':')
                 if dtf == idx:
-                    datas.replace(dtc,dtb + ':' + value)
+                    datas = datas.replace(dtc,dtf + ':' + value)
             await File.write('\\UserDB\\' + str(message.guild.id) + '__guild__',datas)
         else:
             await File.append('\\UserDB\\' + str(message.guild.id) + '__guild__','\n' + idx + ':' + value)
@@ -191,10 +198,11 @@ class log:
         elif md == 'slogin':
             logd = date.load() + '로그인 : {0}'.format(msg.user)
         elif md == 'sndmsg':
-            logd = date.load() + '메시지 전송 : ' + msg.content
+            logd = date.load() + '메시지 전송 [' + msg.guild.name + '] : ' + msg.content
         elif md == 'sutdwn':
             logd = date.load() + '시스템 종료.'
         elif md == 'cmddnd':
             logd = date.load() + '권한 부족 [' + msg.author.name + '] : ' + msg.content
         print(logd)
         await log.send(logd + "\n")
+

@@ -3,6 +3,7 @@ import discord
 import config
 from koicmds import koicmd
 from koimodules import log
+from koimodules import guildDB
 
 class MyClient(discord.Client):
     async def on_ready(self):
@@ -20,9 +21,16 @@ class MyClient(discord.Client):
             await log.write(message,'sndmsg')
             return
 
+        # 서버 내 설정 접미사 확인
+        if await guildDB.read(message,'prefix') != None:
+            prefix = await guildDB.read(message,'prefix')
+        else:
+            prefix = config.prefix
+            
+            
         # 봇 명령어 접미사 감지
-        if message.content.startswith(config.prefix):
-            ftext = message.content.replace(config.prefix,'',1)
+        if message.content.startswith(prefix):
+            ftext = message.content.replace(prefix,'',1)
             cmd = ftext.split(" ")[0]
 
             # 커맨드 유효 확인

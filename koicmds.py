@@ -26,3 +26,13 @@ class koicmd():
     async def 출석(message,self):
         await daily.check(message,self)
         return
+
+    async def prefix(message,self):
+        try:
+            setprefix = message.content.split(' ')[1]
+        except IndexError:
+            await guildDB.set(message,'prefix',config.prefix)
+            await message.channel.send('본 서버의 명령 칭호가 초기화 되었습니다.')
+        else:
+            await guildDB.set(message,'prefix',setprefix)
+            await message.channel.send('이제 본 서버의 명령 칭호는 `' + setprefix + '`입니다.')
