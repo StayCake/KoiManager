@@ -436,7 +436,7 @@ class prefixer:
             return config.prefix
     async def set(message,value):
         await guildDB.set(message,'prefix',value)
-        await message.channel.send('이제 본 서버의 명령 칭호는 `' + setprefix + '`입니다.')
+        await message.channel.send('이제 본 서버의 명령 칭호는 `' + value + '`입니다.')
     async def reset(message):
         await guildDB.set(message,'prefix',config.prefix)
         await message.channel.send('본 서버의 명령 칭호가 초기화 되었습니다.')
