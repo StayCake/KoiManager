@@ -1,0 +1,34 @@
+{
+  "name": "koimanager-node",
+  "version": "1.6.31",
+  "description": "Koi Discord Bot",
+  "main": "main.js",
+  "dependencies": {
+    "@discordjs/opus": "^0.5.3",
+    "bufferutil": "^4.0.3",
+    "discord-slash-commands-client": "^1.2.1",
+    "discord.js": "^12.5.3",
+    "erlpack": "^0.1.3",
+    "ffmpeg-static": "^4.4.0",
+    "libsodium-wrappers": "^0.7.9",
+    "utf-8-validate": "^5.0.5",
+    "ytdl-core": "^4.8.3",
+    "ytpl": "^2.2.1",
+    "ytsr": "^3.5.0",
+    "zlib-sync": "^0.1.7"
+  },
+  "devDependencies": {},
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/StayCake/KoiManager-Node.git"
+  },
+  "author": "KeiKoi",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/StayCake/KoiManager-Node/issues"
+  },
+  "homepage": "https://github.com/StayCake/KoiManager-Node#readme"
+}

@@ -1,0 +1,132 @@
+const Discord = require('discord.js');
+const client = new Discord.Client();
+const ytdl = require('ytdl-core');
+var token = require('./token.json');
+
+console.log ('가동 시작!')
+client.on('ready', () => {
+    console.log('=========================')
+    console.log(`${client.user.tag} | 봇 로그인!`)
+    client.user.setActivity('!명령어 | 발전', {type: 'PLAYING'})
+    console.log('=========================')
+});
+
+client.login(token.data);
+
+client.on('message', async message => {
+    cmd = message.content.split(" ")[0]
+    if (cmd === `!shutdown`) {
+        if (message.author.id === token.author) {
+            await message.channel.send(`Shutting down...`)
+            console.log(`Shutting down by ${message.author.username}...`)
+            client.destroy()
+        } else {
+            message.channel.send(`Permission Denied.`)
+            console.log(`${message.author.username} tried to execute denied command!`)
+        }
+    }
+    if (cmd === `!명령어`) message.channel.send(`
+    > !재생 <링크 | 동영상 ID> - 재생하기
+    > - 말 그대로 노래틀기. [실시간 링크시 실시간 종료까지 연속재생.]
+    > 
+    > !일시정지 - 잠깐 멈추기
+    > - !다시재생으로 재생 가능.
+    > 
+    > !다시재생 - 일시정지 풀기
+    > - !일시정지로 정지된 노래 이어듣기.
+    > 
+    > !볼륨 <0~300> - 볼륨 맟추기
+    > - 백분율이니 너무 작다 싶으면 100 이상으로 해주면 됨.
+    > 
+    > !귓구녕뚫어 - **볼륨 25000%**
+    > - ㄹㅇ 귓구녕 뚫는용.
+    > 
+    > !중지 - 노래 끊기
+    > - 노래를 끊고 봇을 내보냄.`)
+    //여기서부턴 보이스
+    if (!message.guild) return;
+
+    if (cmd === `!재생`) {
+        if (message.member.voice.channel) {
+            linkd = message.content.split(" ")[1]
+            if (linkd === "" || linkd === undefined) {
+                message.channel.send("뭘 재생해요..?")
+            } else {
+                if (ytdl.validateURL(linkd) || ytdl.validateID(linkd)) {
+                    stream = ytdl(linkd, {filter: 'audioonly'})
+                    stream.on('info', (info) => {
+                        message.channel.send(`> ${info.videoDetails.title}\n\n재생 시작!`);
+                        console.log(`Playing ${info.videoDetails.title} in ${message.guild.name}...`);
+                    });
+                    const connection = await message.member.voice.channel.join();
+                    const dispatcher = connection.play(stream)
+                    dispatcher.setVolume(0.6);
+                    dispatcher.on('finish', () => {
+                        dispatcher.destroy();
+                        message.guild.voice.channel.leave();
+                        message.channel.send("끝났으니 가볼게요!")
+                        console.log(`Finished play in ${message.guild.name}...`);
+                    });
+                } else {
+                    message.channel.send("알 수 없는 주소인데요.")
+                }
+            }
+        } else {
+            message.channel.send('음성방에 없는데요.')
+        }
+    }
+    if (message.guild.voice === undefined || message.member === null) return;
+    if (message.member.voice.channel && message.guild.voice.channel){
+        const connection = await message.member.voice.channel.join()
+        const dispatcher = connection.dispatcher
+        if (cmd === `!일시정지`) {
+            if (!dispatcher.paused) {
+                dispatcher.pause();
+                message.channel.send('일시정지 중...')
+                console.log(`Paused play in ${message.guild.name}...`);
+            }
+            else {
+                message.channel.send('이미 일시정지 중인데요.')
+            }
+        }
+        if (cmd === `!다시재생`) {
+            if (dispatcher.paused) {
+                dispatcher.resume();
+                message.channel.send('다시재생 중...')
+                console.log(`Resumed play in ${message.guild.name}...`);
+            }
+            else {
+                message.channel.send('다시재생 할게 없는데요.')
+            }
+        }
+        if (cmd === `!중지`) {
+            dispatcher.destroy();
+            message.guild.voice.channel.leave();
+            message.channel.send("멈췄으니 가볼게요!")
+            console.log(`Stopped play in ${message.guild.name}...`);
+        }
+        if (cmd === `!볼륨`) {
+            res = message.content.split(" ")[1]
+            fres = parseInt(res)
+            if (fres === undefined) {
+                message.channel.send("그게 숫자인가요..?")
+            } else {
+                if (fres < 0) {
+                    message.channel.send("그게 들리긴 한가요..?")
+                } else if (fres === 0) {
+                    dispatcher.setVolume(0)
+                    message.channel.send("음소거 중...")
+                } else if (fres > 300) {
+                    message.channel.send("누구 귓구멍 뚫을 일 있나요..?")
+                } else {
+                    dispatcher.setVolume(0.4 * (fres / 100))
+                    message.channel.send(`볼륨이 ${fres}%로 설정되었습니다.`)
+                }
+            }
+        }
+        if (cmd === `!귓구녕뚫어`) {
+            dispatcher.setVolume(100)
+            message.channel.send(`볼륨이 25000%로 설정되었습니다!!!!!`)
+        }
+    }
+});
