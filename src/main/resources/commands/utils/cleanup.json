@@ -1,0 +1,14 @@
+{
+  "name": "청소",
+  "description": "채팅을 청소합니다.",
+  "options" : [
+    {
+      "name": "갯수",
+      "description": "청소할 개수를 적어주세요. [공란시 자동 최대치 100개]",
+      "type" : 4,
+      "min_value": 1,
+      "max_value": 100,
+      "required": false
+    }
+  ]
+}

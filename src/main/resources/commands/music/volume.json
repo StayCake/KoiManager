@@ -1,0 +1,14 @@
+{
+  "name": "볼륨",
+  "description": "볼륨을 조절하거나 확인합니다.",
+  "options" : [
+    {
+      "name": "값",
+      "description": "볼륨값을 적어주세요.",
+      "type" : 4,
+      "required": false,
+      "min_value": 0,
+      "max_value": 300
+    }
+  ]
+}
