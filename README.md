@@ -1,8 +1,13 @@
-# Koimanager
+# KoiManager
+ KoiManager Remake
+
+You must put your token.json like this
 
 @Deprecated
-No Longer Update
+Remake On discord4j
 
-This is an practice discord bot
-
-Thanks for helping
+{
+    "data" : "The.awesome.your.bot.token",
+    "author" : "the owner user id",
+    "bid" : "bot accounts user id"
+}
