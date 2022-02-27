@@ -12,6 +12,7 @@ import discord4j.core.event.domain.interaction.ChatInputInteractionEvent
 object TrackControl {
     fun nextTrackPlay(player: AudioPlayer, track: AudioTrack?, event: ChatInputInteractionEvent) {
         val guildConf = Data.getConf(event.interaction.guildId.get())
+        if (lastTrack[player] == null) track?.let { lastTrack[player] = it }
         val nextTrack = when (guildConf.repeat) {
             0 -> {
                 if (!(0..1).contains(trackList[player]?.size)) {
