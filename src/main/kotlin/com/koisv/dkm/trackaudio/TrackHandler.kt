@@ -20,9 +20,10 @@ class TrackHandler(private val player: AudioPlayer,private val event: ChatInputI
 
     override fun trackLoaded(track: AudioTrack?) {
         if (track != null) {
+            if (trackList[player] == null) trackList[player] = mutableListOf()
             trackList[player]?.add(track)
-            if (player.playingTrack == null) TrackControl.nextTrackPlay(player, track, event)
-            else Replies.interactEdit(event,"${track.info?.title} [${Convert.timeStamp(track)}] 추가 완료!")
+            if (player.playingTrack == null) TrackControl.nextTrackPlay(player, null, event)
+            else Replies.interactEdit(event, "${track.info?.title} [${Convert.timeStamp(track)}] 추가 완료!")
         } else {
             if (guild != null) Quit.localDisconnect(player,guild)
             Replies.interactEdit(

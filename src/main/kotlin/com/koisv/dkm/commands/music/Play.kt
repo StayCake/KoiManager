@@ -25,8 +25,8 @@ class Play : SlashCmd {
                 .withSelfDeaf(true)
                 .withProvider(provider)
                 .subscribe {
-                guildConnections.add(it)
-            }
+                    guildConnections.add(it)
+                }
         }
     }
 
@@ -60,7 +60,8 @@ class Play : SlashCmd {
         val provider : AudioProvider = TrackProvider(player)
         if (trackList[player] == null) trackList[player] = mutableListOf()
 
-        if (event.options.size == 0) return if (trackList[player]?.isEmpty() == true) {
+        val trackSize = trackList[player]?.size ?: 0
+        if (event.options.size == 0) return if (trackSize <= 0) {
             event.reply()
                 .withEphemeral(true)
                 .withContent("재생 할 곡이 없습니다.")
