@@ -22,6 +22,10 @@
       "name": "끄기",
       "description": "반복을 끕니다.",
       "type": 1
+    },{
+      "name": "상태",
+      "description": "반복이 켜져있는지 알려줍니다.",
+      "type": 1
     }
   ]
 }

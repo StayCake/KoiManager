@@ -32,6 +32,7 @@ val guildConnections = mutableListOf<VoiceConnection>()
 val musicPlayers = mutableMapOf<Snowflake,AudioPlayer>()
 val trackList = mutableMapOf<AudioPlayer,MutableList<AudioTrack>>()
 val trackListeners = mutableMapOf<AudioPlayer, AudioEventAdapter>()
+val lastTrack = mutableMapOf<AudioPlayer,AudioTrack>()
 
 var lastUp : Long = 0
 

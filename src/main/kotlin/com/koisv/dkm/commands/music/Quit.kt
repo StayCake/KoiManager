@@ -4,6 +4,7 @@ import com.koisv.dkm.commands.Replies
 import com.koisv.dkm.commands.SlashCmd
 import com.koisv.dkm.guildConnections
 import com.koisv.dkm.musicPlayers
+import com.koisv.dkm.trackList
 import com.koisv.dkm.trackListeners
 import com.sedmelluq.discord.lavaplayer.player.AudioPlayer
 import discord4j.core.`object`.entity.Guild
@@ -35,6 +36,7 @@ class Quit : SlashCmd {
 
     companion object {
         fun localDisconnect(player: AudioPlayer?,guild: Guild) {
+            trackList[player]?.remove(player?.playingTrack)
             player?.stopTrack()
             player?.removeListener(trackListeners[player])
             guildConnections.removeIf { it.guildId == guild.id }

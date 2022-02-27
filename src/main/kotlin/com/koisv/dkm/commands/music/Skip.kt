@@ -2,9 +2,11 @@ package com.koisv.dkm.commands.music
 
 import com.koisv.dkm.commands.Replies
 import com.koisv.dkm.commands.SlashCmd
+import com.koisv.dkm.lastTrack
 import com.koisv.dkm.musicPlayers
 import com.koisv.dkm.trackList
 import com.koisv.dkm.trackListeners
+import com.koisv.dkm.trackaudio.TrackControl
 import com.koisv.dkm.trackaudio.TrackEvents
 import discord4j.core.event.domain.interaction.ChatInputInteractionEvent
 import reactor.core.publisher.Mono
@@ -26,7 +28,7 @@ class Skip : SlashCmd {
             val listener = TrackEvents(event)
             trackListeners[player] = listener
             player.addListener(listener)
-            trackList[player]?.indexOf(player.playingTrack)?.let { if (it != -1) trackList[player]?.removeAt(it) }
+            trackList[player]?.remove(lastTrack[player])
             player.stopTrack()
             if (trackList[player]?.isEmpty() == true) {
                 Quit.localDisconnect(player,guild)
@@ -37,10 +39,7 @@ class Skip : SlashCmd {
                 event.reply()
                     .withEphemeral(false)
                     .withContent("건너뛸게요!").block()
-                val nextTrack = trackList[player]?.get(
-                    (0 until (trackList[player]?.size?.minus(1) ?: 0)).random()
-                )
-                player.playTrack(nextTrack)
+                TrackControl.nextTrackPlay(player,null,event)
             }
             return Mono.empty()
         }

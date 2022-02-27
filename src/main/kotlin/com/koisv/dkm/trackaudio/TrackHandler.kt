@@ -21,7 +21,7 @@ class TrackHandler(private val player: AudioPlayer,private val event: ChatInputI
     override fun trackLoaded(track: AudioTrack?) {
         if (track != null) {
             trackList[player]?.add(track)
-            if (player.playingTrack == null) player.playTrack(trackList[player]?.get(0))
+            if (player.playingTrack == null) TrackControl.nextTrackPlay(player, track, event)
             else Replies.interactEdit(event,"${track.info?.title} [${Convert.timeStamp(track)}] 추가 완료!")
         } else {
             if (guild != null) Quit.localDisconnect(player,guild)
@@ -37,7 +37,7 @@ class TrackHandler(private val player: AudioPlayer,private val event: ChatInputI
                 if (trackList[player] == null) trackList[player] = mutableListOf()
                 trackList[player]?.add(it)
             }
-            if (player.playingTrack == null) player.playTrack(trackList[player]?.get(0))
+            TrackControl.nextTrackPlay(player,null,event)
             Replies.interactEdit(event,":notes: 재생목록 " + (playlist.name ?: "[**제목 오류**]") + " 로딩 완료!")
         } else {
             if (guild != null) Quit.localDisconnect(player,guild)
@@ -46,6 +46,10 @@ class TrackHandler(private val player: AudioPlayer,private val event: ChatInputI
     }
 
     override fun noMatches() {
+        if (guild != null) Quit.localDisconnect(player,guild)
+        Replies.interactEdit(
+            event,"링크가 올바르지 않거나 문제가 있습니다!"
+        )
     }
 
     override fun loadFailed(exception: FriendlyException?) {

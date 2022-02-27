@@ -1,10 +1,9 @@
 package com.koisv.dkm.trackaudio
 
 import com.koisv.dkm.commands.Replies
-import com.koisv.dkm.commands.music.Quit
 import com.koisv.dkm.data.Convert
-import com.koisv.dkm.data.Data
 import com.koisv.dkm.trackList
+import com.koisv.dkm.trackaudio.TrackControl.nextTrackPlay
 import com.sedmelluq.discord.lavaplayer.player.AudioPlayer
 import com.sedmelluq.discord.lavaplayer.player.event.AudioEventAdapter
 import com.sedmelluq.discord.lavaplayer.track.AudioTrack
@@ -20,41 +19,13 @@ class TrackEvents(private val event: ChatInputInteractionEvent) : AudioEventAdap
     override fun onTrackEnd(player: AudioPlayer?, track: AudioTrack?, endReason: AudioTrackEndReason) {
         if (endReason.mayStartNext) {
             if (trackList[player] == null) logger.error("[M] 대체 이건 무슨 일이지? | $player") else {
-                val guildConf = Data.getConf(event.interaction.guildId.get())
-                val nextTrack = when (guildConf.repeat) {
-                    0 -> {
-                        if (!(0..1).contains(trackList[player]?.size)) {
-                            trackList[player]?.indexOf(track)?.let { trackList[player]?.removeAt(it) }
-                            trackList[player]?.get(
-                                if (guildConf.shuffle) {
-                                    (0 until (trackList[player]?.size?.minus(1) ?: 0)).random()
-                                } else 0
-                            )
-                        } else null
+                if (player != null) {
+                    if (endReason != AudioTrackEndReason.LOAD_FAILED) nextTrackPlay(player, track, event)
+                    else {
+                        trackList[player]?.remove(track)
+                        nextTrackPlay(player, null, event)
                     }
-                    1 -> {
-                        if (trackList[player]?.size != 0) {
-                            trackList[player]?.get(0)?.makeClone()?.let { trackList[player]?.add(it) }
-                            trackList[player]?.indexOf(track)?.let { trackList[player]?.removeAt(it) }
-                            trackList[player]?.get(
-                                if (guildConf.shuffle) {
-                                    (0 until (trackList[player]?.size?.minus(1) ?: 0)).random()
-                                } else 0
-                            )
-                        } else null
-                    }
-                    2 -> {
-                        if (trackList[player]?.size != 0) {
-                            trackList[player]?.get(0)?.makeClone()
-                        } else null
-                    }
-                    else -> null
                 }
-                if (nextTrack == null) {
-                    event.interaction.guild.subscribe { Quit.localDisconnect(player, it) }
-                    if (trackList[player]?.isNotEmpty() == true) trackList[player]?.clear()
-                    Replies.interactEdit(event,"재생이 끝나 자동 퇴장 되었습니다.")
-                } else player?.playTrack(nextTrack)
             }
         }
 

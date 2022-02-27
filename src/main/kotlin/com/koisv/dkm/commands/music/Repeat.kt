@@ -43,6 +43,17 @@ class Repeat : SlashCmd{
                     "이미 꺼져있습니다!"
                 }
             }
+            "상태" -> {
+                emp = true
+                "현재 반복이 ${
+                    when (currentConf.repeat) {
+                        0 -> "꺼져"
+                        1 -> "켜져"
+                        2 -> "한곡 반복중에"
+                        else -> "꺼져"
+                    }
+                } 있습니다."
+            }
             else -> "오류 발생."
         }
         return event.reply()

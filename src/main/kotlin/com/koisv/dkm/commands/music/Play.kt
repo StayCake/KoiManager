@@ -30,9 +30,11 @@ class Play : SlashCmd {
         }
     }
 
+
     override val name: String = "재생"
 
     override fun handle(event: ChatInputInteractionEvent): Mono<Void> {
+        val guildConf = getConf(event.interaction.guildId.get())
         val target = event.interaction.member.get()
         val guild = target.guild.block() ?: return Replies.nonDM(event)
         val targetVoice = target.voiceState.block()?.channel?.block()
@@ -69,7 +71,13 @@ class Play : SlashCmd {
 
             player.removeListener(trackListeners[player])
             connect(targetVoice, provider)
-            player.playTrack(trackList[player]?.get(0)?.makeClone())
+            val next = trackList[player]?.get(
+                if (guildConf.shuffle) {
+                    (0 until (trackList[player]?.size?.minus(1) ?: 0)).random()
+                } else 0
+            )
+            next?.let { lastTrack[player] = it }
+            player.playTrack(next)
             event.reply()
                 .withEphemeral(false)
                 .withContent("재생 준비중...")
