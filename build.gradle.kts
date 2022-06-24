@@ -5,24 +5,20 @@ plugins {
 }
 
 group "com.koisv"
-version "1.0-SNAPSHOT"
+version "1.0"
 
 repositories {
     mavenCentral()
-    maven("https://m2.dv8tion.net/releases")
+    maven("https://oss.sonatype.org/content/repositories/snapshots")
 }
 
 dependencies {
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:+")
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-reactor:1.5.1-native-mt")
-    implementation("org.jetbrains.kotlinx:kotlinx-serialization-runtime:+")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.6.1")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-reactor:1.6.1-native-mt")
+    implementation("org.jetbrains.kotlinx:kotlinx-serialization-runtime:0.20.0")
     implementation("org.jetbrains.kotlin:kotlin-stdlib:+")
-    implementation("org.slf4j:slf4j-simple:+")
-    implementation("com.discord4j:discord4j-core:+")
-    implementation("io.netty:netty-tcnative:+")
-    implementation("com.google.http-client:google-http-client-jackson2:+")
-    implementation("com.google.apis:google-api-services-youtube:+")
-    implementation("com.sedmelluq:lavaplayer:1.3.77")
+    implementation("org.slf4j:slf4j-simple:1.7.36")
+    implementation("dev.kord:kord-core:0.8.0-M14")
 }
 tasks {
     compileKotlin {
