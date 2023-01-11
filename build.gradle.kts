@@ -5,20 +5,20 @@ plugins {
 }
 
 group "com.koisv"
-version "1.0"
 
 repositories {
     mavenCentral()
+    maven("https://jitpack.io")
     maven("https://oss.sonatype.org/content/repositories/snapshots")
+    maven("https://m2.dv8tion.net/releases")
 }
-
 dependencies {
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.6.1")
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-reactor:1.6.1-native-mt")
-    implementation("org.jetbrains.kotlinx:kotlinx-serialization-runtime:0.20.0")
-    implementation("org.jetbrains.kotlin:kotlin-stdlib:+")
-    implementation("org.slf4j:slf4j-simple:1.7.36")
-    implementation("dev.kord:kord-core:0.8.0-M14")
+    implementation("org.slf4j:slf4j-simple:+")
+    implementation("dev.kord:kord-core:0.8.x-SNAPSHOT")
+    implementation("dev.kord:kord-voice:0.8.x-SNAPSHOT")
+    implementation("dev.kord:kord-gateway:0.8.x-SNAPSHOT")
+    implementation("com.github.walkyst:lavaplayer-fork:+")
+    compileOnly("org.jetbrains.kotlin:kotlin-stdlib:+")
 }
 tasks {
     compileKotlin {
@@ -35,7 +35,7 @@ tasks {
             attributes["Main-Class"] = "com.koisv.dkm.MainKt"
         }
         archiveClassifier.set("release")
-        archiveVersion.set("R4j 1.0")
+        archiveVersion.set("Kord-R1.0")
     }
     create<Copy>("dist") {
         from (shadowJar)
