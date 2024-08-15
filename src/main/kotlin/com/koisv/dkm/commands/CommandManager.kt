@@ -1,5 +1,7 @@
-package com.koisv.dkm
+package com.koisv.dkm.commands
 
+import com.koisv.dkm.debugGuild
+import com.koisv.dkm.instanceBot
 import dev.kord.common.entity.ChannelType
 import dev.kord.common.entity.Permission
 import dev.kord.common.entity.Permissions
@@ -7,9 +9,12 @@ import dev.kord.core.Kord
 import dev.kord.rest.builder.interaction.*
 import kotlinx.coroutines.isActive
 
-object Commands {
+object CommandManager {
     suspend fun globalReg(kord: Kord) {
         if (!kord.isActive) return
+        kord.createGlobalMessageCommand("Detect") {
+
+        }
         kord.createGlobalChatInputCommand(
             "재생",
             "노래를 재생합니다.",
@@ -49,10 +54,7 @@ object Commands {
 
         val debugId = instanceBot.debugGuild
         if (instanceBot.isTest) {
-            kord.createGlobalChatInputCommand(
-                "dbg",
-                "개발자 전용 명령어 입니다. [사용금지]"
-            ) {
+            kord.createGlobalChatInputCommand("dbg", "개발자 전용 명령어 입니다. [사용금지]") {
                 integer("key", "The Key Code") {
                     minValue = 100000
                     maxValue = 999999
@@ -64,15 +66,11 @@ object Commands {
                     minValue = 100000
                     maxValue = 999999
                 }
-                defaultMemberPermissions = Permissions {
-                    permissions().minus(Permission.UseApplicationCommands)
-                }
+                defaultMemberPermissions = Permissions() + Permission.UseApplicationCommands
             }
         }
     }
-    suspend fun globalCleanUp(kord: Kord) {
-        kord.getGlobalApplicationCommands().collect { it.delete() }
-    }
+    suspend fun globalCleanUp(kord: Kord) = kord.getGlobalApplicationCommands().collect { it.delete() }
     suspend fun debugReload(kord: Kord) {
         kord.createGuildChatInputCommand(
             debugGuild.id, "bmu", "Debug Utility"

@@ -1,7 +1,7 @@
 package com.koisv.dkm.data
 
 import com.koisv.dkm.Events
-import com.koisv.dkm.music.TrackManageHandler
+import com.koisv.dkm.MusicHandler
 import com.koisv.dkm.playerManager
 import com.sedmelluq.discord.lavaplayer.player.AudioPlayer
 import com.sedmelluq.discord.lavaplayer.track.AudioTrack
@@ -23,7 +23,7 @@ data class GuildData @OptIn(KordVoice::class) constructor(
     @Transient val trackList: MutableList<AudioTrack> = mutableListOf(),
     @Transient var voiceLast : Message? = null,
     @Transient var connection : VoiceConnection? = null,
-    @Transient val player: AudioPlayer = playerManager.createPlayer().apply { this.addListener(TrackManageHandler.Event()) },
+    @Transient val player: AudioPlayer = playerManager.createPlayer().apply { this.addListener(MusicHandler.Event()) },
 ) {
     enum class RepeatType { None,One,All }
 }

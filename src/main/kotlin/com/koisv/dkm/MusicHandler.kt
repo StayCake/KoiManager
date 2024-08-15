@@ -1,12 +1,9 @@
-package com.koisv.dkm.music
+package com.koisv.dkm
 
 import com.koisv.dkm.data.GuildData
 import com.koisv.dkm.data.GuildData.RepeatType.*
-import com.koisv.dkm.guildList
-import com.koisv.dkm.instance
-import com.koisv.dkm.music.TrackManageHandler.QueryType.*
-import com.koisv.dkm.music.TrackManageHandler.UpdateType.*
-import com.koisv.dkm.playerManager
+import com.koisv.dkm.MusicHandler.QueryType.*
+import com.koisv.dkm.MusicHandler.UpdateType.*
 import com.sedmelluq.discord.lavaplayer.player.AudioLoadResultHandler
 import com.sedmelluq.discord.lavaplayer.player.AudioPlayer
 import com.sedmelluq.discord.lavaplayer.player.event.AudioEventAdapter
@@ -20,18 +17,19 @@ import dev.kord.common.entity.Snowflake
 import dev.kord.core.behavior.createChatInputCommand
 import dev.kord.core.behavior.edit
 import dev.kord.core.entity.application.GuildChatInputCommand
-import dev.kord.core.kordLogger
 import dev.kord.rest.builder.interaction.integer
 import dev.kord.rest.builder.interaction.subCommand
+import io.ktor.utils.io.*
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.runBlocking
 import kotlin.coroutines.resume
 import kotlin.coroutines.suspendCoroutine
 
-class TrackManageHandler {
+class MusicHandler {
     enum class QueryType { Single,Playlist,Search }
     enum class UpdateType { Volume, Stop, Full, Shuffle, Remove, Pause, Repeat }
+    @OptIn(KordVoice::class)
     companion object {
         suspend fun getTrack(query: String, type: QueryType): List<AudioTrack> {
             return suspendCoroutine {
@@ -58,7 +56,10 @@ class TrackManageHandler {
                         )
                     }
                     override fun noMatches() { it.resume(listOf()) }
-                    override fun loadFailed(exception: FriendlyException?) { it.resume(listOf()) }
+                    override fun loadFailed(exception: FriendlyException?) {
+                        exception?.printStack()
+                        it.resume(listOf())
+                    }
                 })
             }
         }
@@ -227,7 +228,7 @@ class TrackManageHandler {
             thresholdMs: Long,
             stackTrace: Array<out StackTraceElement>?
         ) {
-            kordLogger.error("[M] 트랙 꼬임 발생")
+            logger.error("[M] 트랙 꼬임 발생")
             throw Exception().apply { this.stackTrace = stackTrace }
         }
 
