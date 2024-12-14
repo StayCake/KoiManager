@@ -1,72 +1,92 @@
+@file:OptIn(ExperimentalEncodingApi::class)
 package com.koisv.dkm
 
-import com.koisv.dkm.commands.CommandManager
-import com.koisv.dkm.data.Bot
-import com.koisv.dkm.data.DataManager
-import com.koisv.dkm.data.GuildData
-import com.sedmelluq.discord.lavaplayer.player.DefaultAudioPlayerManager
-import com.sedmelluq.discord.lavaplayer.source.AudioSourceManagers
-import dev.kord.cache.map.MapLikeCollection
-import dev.kord.cache.map.internal.MapEntryCache
-import dev.kord.cache.map.lruLinkedHashMap
-import dev.kord.core.Kord
-import dev.kord.core.entity.Guild
-import dev.kord.core.event.Event
-import dev.kord.core.on
-import dev.kord.gateway.Intent
-import dev.kord.gateway.Intents
-import dev.kord.gateway.NON_PRIVILEGED
-import kotlinx.coroutines.Job
+import com.koisv.dkm.Main.execute
+import com.koisv.dkm.Main.mainLogger
+import com.koisv.dkm.Main.mainUptime
+import com.koisv.dkm.discord.KoiManager
+import com.koisv.dkm.irc.IRCServer
+import com.koisv.dkm.ktor.module
+import io.ktor.server.application.*
+import io.ktor.server.engine.*
+import io.ktor.server.netty.*
+import kotlinx.coroutines.*
+import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant
-import mu.KLogger
+import org.apache.logging.log4j.LogManager
+import org.apache.logging.log4j.Logger
+import kotlin.coroutines.CoroutineContext
+import kotlin.io.encoding.ExperimentalEncodingApi
 
-val guildList: MutableList<GuildData> = mutableListOf()
-val playerManager = DefaultAudioPlayerManager()
-val debugGuildSet = ::debugGuild.isInitialized
-val botGuildInit = ::botGuild.isInitialized
-var debugCode : Int = 0
-lateinit var autoSave : Job
-lateinit var instance : Kord
-lateinit var instanceBot : Bot
-lateinit var debugGuild : GuildData
-lateinit var botGuild: Guild
-lateinit var Uptime: Instant
-lateinit var logger: KLogger
+const val DEBUG_FLAG = "debug"
+
+lateinit var discord: KoiManager
+lateinit var ircServer: IRCServer
+val ktor = embeddedServer(Netty, port = 8921, host = "0.0.0.0", module = Application::module)
+var debug = false
 
 suspend fun main(args: Array<String>) {
-    val bots = DataManager.botLoad()
-    guildList.addAll(DataManager.guildLoad())
+    // Improved clarity by creating isDebugMode variable
+    debug = args.contains(DEBUG_FLAG)
+    mainLogger.info("부팅 시작 시간: $mainUptime")
+    execute(args)
+}
 
-    instanceBot =
-        if (args.isNotEmpty() && args[0].startsWith("bot"))
-            if (args[0].split(":").size != 2)
-                throw IndexOutOfBoundsException("올바른 숫자를 입력해 주세요. | 예) bot:1")
-            else bots[args[0].split(":")[1].toInt()] else bots[0]
-    instance = Kord(instanceBot.token) {
-        cache {
-            messages { cache, description ->
-                MapEntryCache(cache, description, MapLikeCollection.lruLinkedHashMap(maxSize = 20))
-            }
-            guilds { cache, description ->
-                MapEntryCache(cache, description, MapLikeCollection.concurrentHashMap())
-            }
-            members { cache, description ->
-                MapEntryCache(cache, description, MapLikeCollection.concurrentHashMap())
-            }
-        }
-        enableShutdownHook = true
+object Main : CoroutineScope {
+    private val invalidBotException = IndexOutOfBoundsException("올바른 숫자를 입력해 주세요. | 예) bot:1")
+    private val job = Job()
+    override val coroutineContext: CoroutineContext = Dispatchers.IO + job
+    val mainLogger: Logger = LogManager.getLogger("Main")
+    val mainUptime: Instant = Clock.System.now()
+    val loggerGui = LoggerGUI()
+    private val dBots = DataManager.Discord.botLoad()
+
+    suspend fun execute(args: Array<String>) {
+        val superJob = supervisorScope {
+            launch { discord(args) }.job
+            launch { irc() }.job
+            launch { ktor() }.job
+        }.job
+        waitForCompletion(superJob)
     }
-    logger = mu.KLogging().logger
 
-    if (instanceBot.isTest) logger.warn("!!!TESTMODE!!!")
-    DataManager.dataCleanup(guildList)
-    CommandManager.globalReg(instance)
-    autoSave = DataManager.autoSave()
+    private suspend fun discord(args: Array<String>): Boolean {
+        val botData = dBotData(args)
+        botData?.let {
+            discord = KoiManager(it, args)
+            mainLogger.info("디스코드 봇이 로드되었습니다. 디스코드 봇 실행 중...")
+            discord.start(noLogin = false)
+        } ?: mainLogger.warn("디스코드 봇 로드 실패!")
+        return true
+    }
 
-    AudioSourceManagers.registerRemoteSources(playerManager)
-    instance.on<Event> { Events.handle(this) }
+    private suspend fun irc(): Boolean {
+        ircServer = async { IRCServer(6667) }.await()
+        return ircServer.listen().start().also { if (!it) mainLogger.warn("IRC 서버 실행 실패!") }
+    }
 
-    instance.login {
-        intents = Intents(Intents.NON_PRIVILEGED + Intent.GuildMessages + Intent.Guilds)
+    private fun ktor(): Boolean {
+        mainLogger.info("Ktor 실행 중...")
+        ktor.start(wait = true)
+        return true
+    }
+
+    private fun dBotData(args: Array<String>) =
+        if (dBots.isNotEmpty()) {
+            val botArgument = args.firstOrNull { it.startsWith("bot") }
+            botArgument?.split(":")?.let {
+                when (it.size) {
+                    2 -> dBots[it[1].toIntOrNull() ?: throw invalidBotException]
+                    else -> throw invalidBotException
+                }
+            } ?: dBots[0]
+        } else {
+            mainLogger.warn("봇 데이터가 없습니다! 디스코드 봇이 작동하지 않습니다.")
+            null
+        }
+
+    private fun waitForCompletion(job: Job) {
+        while (!job.isCompleted) { /* Do nothing, just wait */
+        }
     }
 }
