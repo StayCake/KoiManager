@@ -1,5 +1,6 @@
 package com.koisv.kcdesktop.ui
 
+import androidx.compose.animation.*
 import androidx.compose.desktop.ui.tooling.preview.Preview
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -11,6 +12,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.delay
 
 object MainUI {
     private val defaultPadding = Modifier.padding(16.dp)
@@ -34,26 +36,8 @@ object MainUI {
     }
 
     @Composable
-    private fun SnackbarAlert(text: String) {
-        Snackbar(
-
-        ) {
-            Card(
-                modifier = Modifier.padding(6.dp),
-                shape = RoundedCornerShape(8.dp),
-                backgroundColor = Color(100, 230, 100, 220)
-            ) {
-                Text(
-                    text,
-                    modifier = Modifier.padding(4.dp),
-                    textAlign = TextAlign.Center
-                )
-            }
-        }
-    }
-
-    @Composable
     private fun HeaderBar(title: String) {
+
         TopAppBar(
             title = { Text(title) },
             backgroundColor = Color(100, 230, 100, 220),
@@ -68,6 +52,7 @@ object MainUI {
         var id by remember { mutableStateOf("") }
         var nickname by remember { mutableStateOf("") }
         var otp by remember { mutableStateOf("") }
+        var showSnackbar by remember { mutableStateOf(false) }
 
         MaterialTheme {
             Column(modifier = defaultPadding) {
@@ -91,9 +76,19 @@ object MainUI {
                 )
                 Button(onClick = {
                     println("ID: $id, Nickname: $nickname, OTP: $otp")
+                    showSnackbar = true
                 }) {
                     Text("Register")
                 }
+                SlideInSnackbar(text = "Registration Successful", visible = showSnackbar)
+            }
+        }
+
+        // Automatically hide the Snackbar after 3 seconds
+        LaunchedEffect(showSnackbar) {
+            if (showSnackbar) {
+                delay(3000)
+                showSnackbar = false
             }
         }
     }
@@ -103,12 +98,12 @@ object MainUI {
     fun Login() {
         var id by remember { mutableStateOf("") }
         var keepLogin by remember { mutableStateOf(false) }
+        var showSnackbar by remember { mutableStateOf(false) }
 
         MaterialTheme {
             Scaffold(
                 topBar = { HeaderBar("KoiChat Client [WSS]") }
             ) {
-                SnackbarAlert("Hello World!")
                 Column(modifier = defaultPadding) {
                     InputField(
                         value = id,
@@ -122,7 +117,45 @@ object MainUI {
                             onCheckedChange = { keepLogin = it },
                             modifier = checkboxPadding
                         )
+                        Text("Keep me logged in", modifier = endTextPadding)
+                        Button(onClick = {
+                            println("ID: $id, Keep Login: $keepLogin")
+                            showSnackbar = true
+                        }) {
+                            Text("Login")
+                        }
                     }
+                }
+            }
+        }
+
+        // Automatically hide the Snackbar after 3 seconds
+        LaunchedEffect(showSnackbar) {
+            if (showSnackbar) {
+                delay(3000)
+                showSnackbar = false
+            }
+        }
+    }
+
+    @Composable
+    fun SlideInSnackbar(text: String, visible: Boolean) {
+        AnimatedVisibility(
+            visible = visible,
+            enter = slideInVertically(initialOffsetY = { it }) + fadeIn(),
+            exit = slideOutVertically(targetOffsetY = { it }) + fadeOut()
+        ) {
+            Snackbar {
+                Card(
+                    modifier = Modifier.padding(6.dp),
+                    shape = RoundedCornerShape(8.dp),
+                    backgroundColor = Color(100, 230, 100, 220)
+                ) {
+                    Text(
+                        text,
+                        modifier = Modifier.padding(4.dp),
+                        textAlign = TextAlign.Center
+                    )
                 }
             }
         }

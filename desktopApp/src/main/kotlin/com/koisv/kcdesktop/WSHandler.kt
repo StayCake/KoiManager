@@ -10,9 +10,17 @@ import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 import java.io.File
+import java.time.LocalDateTime
 
 @OptIn(DelicateCoroutinesApi::class)
 object WSHandler {
+    data class WSCUser(
+        val id: String,
+        val nickname: String,
+        val lastOnline: LocalDateTime,
+        val onMobile: Boolean
+    )
+
     val wsClient = HttpClient(CIO) {
         install(WebSockets)
     }
