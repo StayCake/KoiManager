@@ -44,8 +44,6 @@ import kotlin.io.encoding.ExperimentalEncodingApi
 
 @ExperimentalEncodingApi
 object ChatUI {
-    var update by mutableStateOf(0.0f)
-
     private val animationSpec = spring<Float>(
         dampingRatio = Spring.DampingRatioMediumBouncy,
         stiffness = Spring.StiffnessMediumLow,
