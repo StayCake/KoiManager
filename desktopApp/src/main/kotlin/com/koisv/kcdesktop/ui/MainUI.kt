@@ -1,43 +1,70 @@
 package com.koisv.kcdesktop.ui
 
 import androidx.compose.animation.*
-import androidx.compose.desktop.ui.tooling.preview.Preview
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.*
-import androidx.compose.runtime.*
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import kotlinx.coroutines.delay
+import kotlin.io.encoding.ExperimentalEncodingApi
 
+@ExperimentalEncodingApi
 object MainUI {
-    private val defaultPadding = Modifier.padding(16.dp)
-    private val smallPadding = Modifier.padding(8.dp)
-    private val checkboxPadding = Modifier.padding(start = 4.dp)
-    private val endTextPadding = Modifier.padding(end = 8.dp)
+    val defaultPadding = Modifier.padding(16.dp)
+    val smallPadding = Modifier.padding(8.dp)
+    val checkboxPadding = Modifier.padding(start = 4.dp)
+    val endTextPadding = Modifier.padding(top = 8.dp, end = 8.dp)
+    val transparentColor = Color.Transparent
+
+    var id by mutableStateOf("")
+    var nickname by mutableStateOf("")
+    var otp by mutableStateOf("")
+    var isRegister by mutableStateOf(false)
+    var loginAlert by mutableStateOf(true)
+    var keyFileExceed by mutableStateOf(false)
+
+    var progressText by mutableStateOf("서버 연결 중...")
+    var showSnackbar by mutableStateOf(true)
+    var snackbarText by mutableStateOf("")
+    var progressVisible by mutableStateOf(true)
 
     @Composable
-    private fun InputField(
+    fun InputField(
         value: String,
         onValueChange: (String) -> Unit,
         label: String,
-        modifier: Modifier = Modifier
+        modifier: Modifier = Modifier,
+        isEnable: Boolean = true,
+        isPassword: Boolean = false,
+        onDone: () -> Unit = {}
     ) {
         TextField(
             value = value,
             onValueChange = onValueChange,
             label = { Text(label) },
-            modifier = modifier
+            modifier = modifier,
+            enabled = isEnable,
+            visualTransformation = if (isPassword) PasswordVisualTransformation() else VisualTransformation.None,
+            keyboardOptions = KeyboardOptions.Default,
+            singleLine = true,
+            keyboardActions = KeyboardActions(onDone = { onDone() }),
         )
     }
 
     @Composable
-    private fun HeaderBar(title: String) {
-
+    fun HeaderBar(title: String) {
         TopAppBar(
             title = { Text(title) },
             backgroundColor = Color(100, 230, 100, 220),
@@ -47,94 +74,24 @@ object MainUI {
     }
 
     @Composable
-    @Preview
-    fun Register() {
-        var id by remember { mutableStateOf("") }
-        var nickname by remember { mutableStateOf("") }
-        var otp by remember { mutableStateOf("") }
-        var showSnackbar by remember { mutableStateOf(false) }
-
-        MaterialTheme {
-            Column(modifier = defaultPadding) {
-                InputField(
-                    value = id,
-                    onValueChange = { id = it },
-                    label = "ID",
-                    modifier = smallPadding
-                )
-                InputField(
-                    value = nickname,
-                    onValueChange = { nickname = it },
-                    label = "Nickname [Optional]",
-                    modifier = smallPadding
-                )
-                InputField(
-                    value = otp,
-                    onValueChange = { otp = it },
-                    label = "OTP",
-                    modifier = Modifier.padding(bottom = 16.dp)
-                )
-                Button(onClick = {
-                    println("ID: $id, Nickname: $nickname, OTP: $otp")
-                    showSnackbar = true
-                }) {
-                    Text("Register")
-                }
-                SlideInSnackbar(text = "Registration Successful", visible = showSnackbar)
-            }
-        }
-
-        // Automatically hide the Snackbar after 3 seconds
-        LaunchedEffect(showSnackbar) {
-            if (showSnackbar) {
-                delay(3000)
-                showSnackbar = false
-            }
-        }
-    }
-
-    @Composable
-    @Preview
-    fun Login() {
-        var id by remember { mutableStateOf("") }
-        var keepLogin by remember { mutableStateOf(false) }
-        var showSnackbar by remember { mutableStateOf(false) }
-
-        MaterialTheme {
-            Scaffold(
-                topBar = { HeaderBar("KoiChat Client [WSS]") }
-            ) {
-                Column(modifier = defaultPadding) {
-                    InputField(
-                        value = id,
-                        onValueChange = { id = it },
-                        label = "ID",
-                        modifier = smallPadding
-                    )
-                    Row {
-                        Checkbox(
-                            checked = keepLogin,
-                            onCheckedChange = { keepLogin = it },
-                            modifier = checkboxPadding
-                        )
-                        Text("Keep me logged in", modifier = endTextPadding)
-                        Button(onClick = {
-                            println("ID: $id, Keep Login: $keepLogin")
-                            showSnackbar = true
-                        }) {
-                            Text("Login")
-                        }
+    fun ProgressAlert(visible: Boolean, text: String) {
+        if (visible) {
+            AlertDialog(
+                onDismissRequest = { /* Do nothing */ },
+                title = {
+                    Row(
+                        Modifier.padding(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        CircularProgressIndicator()
+                        Text(text, modifier = Modifier.padding(8.dp))
                     }
-                }
-            }
-        }
-
-        // Automatically hide the Snackbar after 3 seconds
-        LaunchedEffect(showSnackbar) {
-            if (showSnackbar) {
-                delay(3000)
-                showSnackbar = false
-            }
+                },
+                buttons = { /* No buttons */ },
+                shape = RoundedCornerShape(8.dp),
+                backgroundColor = Color(100, 230, 100, 220),
+                contentColor = Color.Black
+            )
         }
     }
 
@@ -145,18 +102,15 @@ object MainUI {
             enter = slideInVertically(initialOffsetY = { it }) + fadeIn(),
             exit = slideOutVertically(targetOffsetY = { it }) + fadeOut()
         ) {
-            Snackbar {
-                Card(
-                    modifier = Modifier.padding(6.dp),
-                    shape = RoundedCornerShape(8.dp),
-                    backgroundColor = Color(100, 230, 100, 220)
-                ) {
-                    Text(
-                        text,
-                        modifier = Modifier.padding(4.dp),
-                        textAlign = TextAlign.Center
-                    )
-                }
+            Snackbar(
+                backgroundColor = Color(120, 250, 110, 220)
+            ) {
+                Text(
+                    text,
+                    modifier = Modifier.padding(4.dp),
+                    textAlign = TextAlign.Center,
+                    color = Color.Black
+                )
             }
         }
     }

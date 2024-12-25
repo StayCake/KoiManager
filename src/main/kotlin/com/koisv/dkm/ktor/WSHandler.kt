@@ -2,16 +2,17 @@ package com.koisv.dkm.ktor
 
 import com.koisv.dkm.DataManager.WSChat
 import com.koisv.dkm.DataManager.WSChat.ConType
+import com.koisv.dkm.DataManager.compressDecRSA
+import com.koisv.dkm.DataManager.compressEncRSA
 import com.koisv.dkm.DataManager.decryptWithRSA
 import com.koisv.dkm.DataManager.encryptWithRSA
 import com.koisv.dkm.DataManager.hash
 import com.koisv.dkm.ktor.WSHandler.ChatSession.ConResult.*
 import io.ktor.server.websocket.*
-import io.ktor.util.encodeBase64
 import io.ktor.websocket.*
 import kotlinx.coroutines.*
 import kotlinx.datetime.Clock
-import kotlinx.datetime.Instant
+import kotlinx.datetime.LocalDateTime
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
 import org.apache.logging.log4j.LogManager
@@ -19,6 +20,7 @@ import org.apache.logging.log4j.Logger
 import java.security.KeyPair
 import java.security.KeyPairGenerator
 import java.security.SecureRandom
+import java.util.*
 import kotlin.io.encoding.Base64
 import kotlin.io.encoding.ExperimentalEncodingApi
 import kotlin.random.Random
@@ -27,10 +29,33 @@ import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
 @ExperimentalEncodingApi
+@ExperimentalUuidApi
+@DelicateCoroutinesApi
 object WSHandler {
     val logger: Logger = LogManager.getLogger("Ktor-Server")
     val sessionMap = mutableMapOf<WebSocketServerSession, ChatSession>()
 
+    suspend fun statusUpdate() {
+        sessionMap.forEach { (session, chatSession) ->
+            val loggedInUser = chatSession.loggedInWith
+            val onlineUsers = WSChat.online.joinToString("|") {
+                buildString {
+                    append(it.userId)
+                    append("%")
+                    append(if (it.conType == ConType.PC) "0" else "1")
+                    append("%")
+                    append(it.lastLogin)
+                    if (it.nick != null) {
+                        append("%")
+                        append(it.nick)
+                    }
+                }
+            }
+            loggedInUser?.let {
+                session.outgoing.send(Frame.Text("wsc:status||${onlineUsers.compressEncRSA(it.encKey)}"))
+            }
+        }
+    }
 
     /**
      * A mutable list that stores the message history for a WebSocket chat application.
@@ -43,20 +68,42 @@ object WSHandler {
      *
      * This list helps in keeping a record of messages exchanged, including the timing and involved users, if available.
      */
-    val messageHistory = mutableListOf<Triple<Instant, WSChat.WSCUser?, Pair<String, WSChat.WSCUser?>>>()
+    val messageHistory = mutableListOf<Triple<LocalDateTime, WSChat.WSCUser?, Pair<String, WSChat.WSCUser?>>>()
 
     init {
         if (messageHistory.isEmpty()) messageHistory.addAll(WSChat.loadMsgHistory().reversed())
+        GlobalScope.launch {
+            while (isActive) {
+                delay(5.seconds)
+                WSChat.online.removeAll { it.session?.isActive != true }
+            }
+        }
     }
 
     class RegisterFailedException(): IndexOutOfBoundsException()
 
-    @OptIn(ExperimentalUuidApi::class, DelicateCoroutinesApi::class)
-    class ChatSession(private val originIP: String) {
+    class ChatSession(val originIP: String, private val session: WebSocketServerSession) {
+        var failCount = 0
         var loggedInWith: WSChat.WSCUser? = null
         val random = Random(Uuid.random().hashCode())
-        val otpJob: Job
+        val otpJob: Job = GlobalScope.launch {
+            while (isActive && session.isActive) {
+                delay(30.seconds)
+                if (isActive && session.isActive) {
+                    otpCode = random.nextInt(0, 9999).let {
+                        val code = String.format(Locale.KOREAN, "%04d", it)
+                        logger.info("OTP RENEWAL | {} | {}", originIP, code)
+                        code.hash()
+                    }
+                }
+            }
+            otpCode = ""
+        }
         var otpCode = ""
+
+        init {
+            otpJob.cancel()
+        }
 
         /**
          * Represents the possible results of a connection attempt.
@@ -67,24 +114,6 @@ object WSHandler {
          * FAIL_NO_PERMISSION - Connection attempt failed due to insufficient permissions.
          */
         enum class ConResult { DONE, FAIL_SAME_USER, FAIL_NO_USER, FAIL_NO_PERMISSION }
-
-        init {
-            otpCode = random.nextInt(0, 9999).let {
-                logger.info("OTP CODE | {} | {}", originIP, it)
-                it.toString().hash()
-            }
-
-            otpJob = GlobalScope.async {
-                while (isActive) {
-                    otpCode = random.nextInt(0, 9999).let {
-                        logger.info("OTP RENEWAL | {} | {}", originIP, it)
-                        it.toString().hash()
-                    }
-                    delay(30.seconds)
-                }
-                otpCode = ""
-            }
-        }
 
         fun changeNickname(user: WSChat.WSCUser, newNick: String?): ConResult {
             val userTargets = WSChat.online.filter { it.userId == user.userId }
@@ -100,7 +129,7 @@ object WSHandler {
             return DONE
         }
 
-        fun keyCreate(): KeyPair {
+        fun rsaKeyCreate(): KeyPair {
             val keygen = KeyPairGenerator.getInstance("rsa")
             keygen.initialize(4096, SecureRandom())
             return keygen.genKeyPair()
@@ -122,21 +151,25 @@ object WSHandler {
             if (WSChat.online.any {it.userId == id && it.conType == conType}) return FAIL_SAME_USER
 
             return if (keyVerify(id, conType, encryptedUserId)) {
-                logger.info("User {} Logged in at {}", id, Clock.System.now())
+                logger.info("User {} Logged in at {}", id, Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault()))
                 loggedInWith = loginTarget
-                val newKey = keyCreate()
-                loginTarget.encKey = Base64.encode(newKey.public.encoded)
+                val newKey = rsaKeyCreate()
                 loginTarget.session = session
-                session.outgoing.send(Frame.Text("wsc:last_login||${loginTarget.lastLogin}"))
+                session.outgoing.send(Frame.Text(
+                    "wsc:last_login||${loginTarget.lastLogin}${loginTarget.nick?.let{ "||$it" } ?: ""}"
+                ))
                 loginTarget.lastLogin = Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault())
+                session.outgoing.send(Frame.Text(
+                    "wsc:private_key_send||${Base64.encode(newKey.private.encoded).compressEncRSA(loginTarget.encKey)}||1"
+                ))
+                loginTarget.encKey = Base64.encode(newKey.public.encoded)
                 WSChat.saveWSCUser(loginTarget)
                 WSChat.online.add(loginTarget)
-                session.outgoing.send(Frame.Text("wsc:private_key_send||${Base64.encode(newKey.private.encoded)}"))
                 DONE
             } else FAIL_NO_PERMISSION
         }
 
-        fun logout(user: WSChat.WSCUser): ConResult {
+        suspend fun logout(user: WSChat.WSCUser): ConResult {
             val logoutTarget = WSChat.online.firstOrNull { it.userId == user.userId && it.conType == user.conType }
                 ?: return FAIL_NO_USER
 
@@ -144,13 +177,14 @@ object WSHandler {
             logoutTarget.session = null
             WSChat.online.remove(logoutTarget)
             loggedInWith = null
+            statusUpdate()
             return DONE
         }
 
         suspend fun handleRecovery(otpCodeInput: String, conType: ConType, userId: String, session: WebSocketServerSession) {
             if (otpCodeInput == otpCode) {
                 otpJob.cancel()
-                val userKey = keyCreate()
+                val userKey = rsaKeyCreate()
                 val existingUser = WSChat.online.firstOrNull { it.userId == userId && it.conType == conType }
                     ?: throw RegisterFailedException()
                 existingUser.encKey = Base64.encode(userKey.public.encoded)
@@ -167,67 +201,95 @@ object WSHandler {
             userId: String,
             nickName: String?,
             session: WebSocketServerSession
-        ) {
-            if (otpCodeInput == otpCode) {
+        ): ConResult {
+            return if (otpCodeInput == otpCode) {
+                if (WSChat.getWSCUser(userId).isNotEmpty()) {
+                    session.outgoing.send(Frame.Text("wsc:register_fail_same_user"))
+                    return FAIL_SAME_USER
+                }
+                logger.info("User {} Registered at {}", userId, Clock.System.now())
                 otpJob.cancel()
-                val userKey = keyCreate()
+                val userKey = rsaKeyCreate()
                 val newUser =
                     WSChat.WSCUser(
                         Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault()),
                         userId, nickName, Base64.encode(userKey.public.encoded),
-                        conType, Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault()), session
+                        conType, Clock.System.now().toLocalDateTime(TimeZone.UTC), session
                     )
                 WSChat.saveWSCUser(newUser)
                 WSChat.online.add(newUser)
+                session.outgoing.send(Frame.Text("wsc:last_login||${newUser.lastLogin}${newUser.nick?.let{ "||$it" } ?: ""}"))
                 session.outgoing.send(Frame.Text("wsc:private_key_send||${Base64.encode(userKey.private.encoded)}"))
-            }
+                statusUpdate()
+                DONE
+            } else FAIL_NO_PERMISSION
         }
 
         suspend fun handleEncryptedMessage(
             encryptedMessage: String,
             session: WebSocketServerSession,
-            recipientUser: List<WSChat.WSCUser>
+            recipientUser: String?
         ): ConResult {
             return try {
                 val user = loggedInWith ?: return FAIL_NO_PERMISSION
 
-                val decryptedMessage = encryptedMessage.decryptWithRSA(user.encKey)
+                val decryptedMessage = encryptedMessage.compressDecRSA(user.encKey)
+                if (decryptedMessage == null) return FAIL_NO_PERMISSION
+
+                val recvUsers = recipientUser.let {
+                    val forNicks = WSChat.online.filter { user -> user.nick == it }
+                    val forIds = WSChat.online.filter { user -> user.userId == it }
+                    (forNicks + forIds).ifEmpty { null }
+                } ?: listOf()
 
                 // Add the message to messageHistory
                 val msgForm = Triple(
-                    Clock.System.now(),
+                    Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault()),
                     user,
-                    Pair(decryptedMessage, recipientUser.first())
+                    Pair(decryptedMessage, recvUsers.firstOrNull())
                 )
 
                 messageHistory.add(msgForm)
                 WSChat.saveMsgHistory(msgForm)
 
                 // Send message to recipientUser only if specified, otherwise to all online users
-                if (recipientUser.isNotEmpty()) {
+                if (recvUsers.isNotEmpty()) {
                     // Logic to encrypt message for recipientUser
-                    recipientUser.forEach {
-                        session.outgoing.send(
+                    recvUsers.forEach {
+                        it.session?.outgoing?.send(
                             Frame.Text(
-                                "wsc:message_prv||${(user.userId+ "||" + decryptedMessage).encryptWithRSA(it.encKey)}"
+                                buildString {
+                                    append("wsc:message_prv||")
+                                    append(user.userId.encryptWithRSA(it.encKey))
+                                    append("||")
+                                    append(decryptedMessage.compressEncRSA(it.encKey))
+                                    append("||")
+                                    append(Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault()).toString())
+                                }
                             )
                         )
                     }
                 } else {
                     WSChat.online.forEach {
-                        // Logic to encrypt message for each user
-                        session.outgoing.send(Frame.Text("wsc:message||${decryptedMessage.encryptWithRSA(it.encKey)}"))
+                        it.session?.outgoing?.send(Frame.Text(buildString {
+                            append("wsc:message||")
+                            append((user.nick ?: user.userId).encryptWithRSA(it.encKey))
+                            append("||")
+                            append(decryptedMessage.compressEncRSA(it.encKey))
+                            append("||")
+                            append(Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault()).toString())
+                        }))
                     }
                 }
                 DONE
             } catch (e: Exception) {
                 logger.error("Error processing message: {}", e.message)
+                e.printStackTrace()
                 FAIL_NO_PERMISSION // or another suitable error enum
             }
         }
     }
 
-    @OptIn(ExperimentalEncodingApi::class)
     suspend fun WebSocketServerSession.handle(data: String) {
 
         /**
@@ -241,26 +303,32 @@ object WSHandler {
          * register : otp_code.conType.user_id.nickname(optional)
          * login : user_id.conType.enc_user_id
          * logout : <none>
+         * history : <none>
          * nick : new_nick(optional, null for clear)
          * recovery : same as register without nickname
          * chat : enc_message.prv_target (optional)
-         * 
+         *
          * - status message -
          * code_gen_successful
          * recovery_success
          * forbidden_nickname
-         * register_success
-         * login_[complete|fail_no_user|fail_same_user|fail_no_permission]
-         * logout_[complete|fail_no_user|fail_no_permission]
+         * register_[success|fail_nickname|fail_same_user]
+         * login_[success|fail_no_user|fail_same_user|fail_no_permission|fail_blocked]
+         * logout_[success|fail_no_user|fail_no_permission]
          * nick_change_[success|fail_no_user|fail_no_permission]
          * send_[complete|fail_no_permission|fail_unknown]
          * history_fail_login_required
          *
          * - return form -
+         * last_login||time||nickname (optional)|... <encrypted>
          * history||time%sender(#)%chat%target(*)|... <encrypted>
-         * private_key_send||key
-         * message||enc_message
-         * message_prv||enc_sender||enc_message
+         * private_key_send||key||1 (optional | 1: for login)
+         * message||enc_sender||enc_message||time
+         * message_prv||enc_sender||enc_message||time
+         * status||user_id%onMobile%last_login%nickname (optional)|... <encrypted>
+         *
+         * - compress form -
+         * %%sec_pass.data (encrypted)
          */
 
         if (data.startsWith("wsc:")) {
@@ -268,10 +336,16 @@ object WSHandler {
 
             val rawData = data.split("||")
             val action = rawData[0].replace("wsc:", "")
-            val paramRaw = data.replace(rawData[0], "")
+            val paramRaw = data.replace(rawData[0] + "||", "")
             val params = paramRaw.split(".")
             when (action) {
                 "code" -> {
+                    currentSession.otpCode =
+                        currentSession.random.nextInt(0, 9999).let {
+                            val code = String.format(Locale.KOREAN, "%04d", it)
+                            logger.info("OTP CODE | {} | {}", currentSession.originIP, code)
+                            code.hash()
+                        }
                     currentSession.otpJob.start()
                     outgoing.send(Frame.Text("wsc:code_gen_successful"))
                 }
@@ -290,10 +364,10 @@ object WSHandler {
                     val nicknamePattern = Regex("^[\\p{L}\\p{N}\\s_-]+$")
 
                     if (!nickName.isNullOrEmpty() && !nicknamePattern.matches(nickName))
-                        outgoing.send(Frame.Text("wsc:forbidden_nickname"))
+                        outgoing.send(Frame.Text("wsc:register_fail_nickname"))
                     else {
-                        currentSession.registerUser(conType, otpCodeInput, userId, nickName, this)
-                        outgoing.send(Frame.Text("wsc:register_success"))
+                        val result = currentSession.registerUser(conType, otpCodeInput, userId, nickName, this)
+                        if (result == DONE) outgoing.send(Frame.Text("wsc:register_success"))
                     }
                 }
                 "login" -> {
@@ -302,11 +376,19 @@ object WSHandler {
                     val encryptedUserId = params[2]
                     val loginRes = currentSession.login(userId, conType, encryptedUserId, this)
                     when (loginRes) {
-                        DONE -> outgoing.send(Frame.Text("wsc:login_complete"))
+                        DONE -> outgoing.send(Frame.Text("wsc:login_success"))
                         FAIL_SAME_USER -> outgoing.send(Frame.Text("wsc:login_fail_same_user"))
                         FAIL_NO_USER -> outgoing.send(Frame.Text("wsc:login_fail_no_user"))
                         FAIL_NO_PERMISSION -> outgoing.send(Frame.Text("wsc:login_fail_no_permission"))
                     }
+                    if (loginRes != DONE)
+                        if (currentSession.failCount > 5) {
+                            outgoing.send(Frame.Text("wsc:login_fail_blocked"))
+                            close(CloseReason(
+                                CloseReason.Codes.VIOLATED_POLICY,
+                                "Too many failed login attempts"
+                            ))
+                        }
                 }
                 "logout" -> {
                     val loggedInUser = currentSession.loggedInWith
@@ -315,7 +397,7 @@ object WSHandler {
                     else FAIL_NO_USER
 
                     when (logoutRes) {
-                        DONE -> outgoing.send(Frame.Text("wsc:logout_complete"))
+                        DONE -> outgoing.send(Frame.Text("wsc:logout_success"))
                         FAIL_NO_USER -> outgoing.send(Frame.Text("wsc:logout_fail_no_user"))
                         FAIL_NO_PERMISSION -> outgoing.send(Frame.Text("wsc:logout_fail_no_permission"))
                         FAIL_SAME_USER -> false
@@ -324,12 +406,8 @@ object WSHandler {
                 "chat" -> {
                     val encryptedMessage = params[0]
                     val prvTarget = params.getOrNull(1)?.ifBlank { null }
-                    val recipientUser = prvTarget?.let {
-                        val forNicks = WSChat.online.filter { it.nick == prvTarget }
-                        val forIds = WSChat.online.filter { it.userId == prvTarget }
-                        (forNicks + forIds).ifEmpty { null }
-                    } ?: listOf()
-                    val messageProcessResult = currentSession.handleEncryptedMessage(encryptedMessage, this, recipientUser)
+                    val messageProcessResult =
+                        currentSession.handleEncryptedMessage(encryptedMessage, this, prvTarget)
 
                     when (messageProcessResult) {
                         DONE -> outgoing.send(Frame.Text("wsc:send_success"))
@@ -351,7 +429,7 @@ object WSHandler {
                         val formattedMessages = lastFiftyMessages.joinToString(delimiter) { (time, sender, content) ->
                             if (content.second?.userId != loggedInUser.userId)
                                 buildString {
-                                    append(time.toLocalDateTime(TimeZone.currentSystemDefault()))
+                                    append(time)
                                     append("%")
                                     append(sender?.nick ?: anonSymbol)
                                     append("%")
@@ -385,6 +463,7 @@ object WSHandler {
                     }
                 }
             }
+            statusUpdate()
         }
         //send(data)
     }

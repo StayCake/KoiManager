@@ -11,7 +11,9 @@ import javax.swing.border.TitledBorder;
 import javax.swing.plaf.metal.MetalLookAndFeel;
 import java.awt.*;
 import java.awt.event.ComponentAdapter;
+import java.lang.reflect.Method;
 import java.util.Objects;
+import java.util.ResourceBundle;
 
 public class LoggerGUI extends JFrame {
     public JPanel mainPanel;
@@ -25,7 +27,7 @@ public class LoggerGUI extends JFrame {
     public JLabel ircTitle;
     public JScrollBar scrollBar1;
     public JPanel ktorPanel;
-    public JTextArea ktorLog;
+    public JTextArea ktor_MLog;
     public JPanel todo1;
     public JScrollPane todo2;
     public JTextArea todo4;
@@ -43,6 +45,10 @@ public class LoggerGUI extends JFrame {
     public JPanel ktor_at;
     public JPanel ktor_wsc;
     public JScrollBar scrollBar2;
+    public JScrollBar scrollBar5;
+    public JScrollPane ktor_MSP;
+    public JScrollPane ktor_wscSP;
+    public JTextPane ktor_wscLog;
 
     public LoggerGUI() throws UnsupportedLookAndFeelException {
         setContentPane(mainPanel);
@@ -120,7 +126,7 @@ public class LoggerGUI extends JFrame {
         discordPanel.add(discordTabP, new GridConstraints(0, 0, 1, 1, GridConstraints.ANCHOR_CENTER, GridConstraints.FILL_BOTH, GridConstraints.SIZEPOLICY_CAN_SHRINK | GridConstraints.SIZEPOLICY_CAN_GROW, GridConstraints.SIZEPOLICY_CAN_SHRINK | GridConstraints.SIZEPOLICY_CAN_GROW, null, new Dimension(200, 200), null, 0, false));
         final JPanel panel1 = new JPanel();
         panel1.setLayout(new GridLayoutManager(1, 2, new Insets(0, 0, 0, 0), -1, -1));
-        discordTabP.addTab("Log - Discord", panel1);
+        discordTabP.addTab(this.$$$getMessageFromBundle$$$("lang", "log.discord"), panel1);
         discordLogR = new JScrollPane();
         discordLogR.setAutoscrolls(true);
         discordLogR.setDoubleBuffered(true);
@@ -148,7 +154,7 @@ public class LoggerGUI extends JFrame {
         panel1.add(scrollBar4, new GridConstraints(0, 1, 1, 1, GridConstraints.ANCHOR_CENTER, GridConstraints.FILL_VERTICAL, 1, GridConstraints.SIZEPOLICY_CAN_SHRINK | GridConstraints.SIZEPOLICY_WANT_GROW, null, null, null, 0, false));
         final JPanel panel2 = new JPanel();
         panel2.setLayout(new GridLayoutManager(4, 3, new Insets(0, 0, 0, 0), -1, -1));
-        discordTabP.addTab("Control", panel2);
+        discordTabP.addTab(this.$$$getMessageFromBundle$$$("lang", "control"), panel2);
         button2 = new JButton();
         button2.setText("Button");
         panel2.add(button2, new GridConstraints(2, 2, 1, 1, GridConstraints.ANCHOR_CENTER, GridConstraints.FILL_HORIZONTAL, GridConstraints.SIZEPOLICY_CAN_SHRINK | GridConstraints.SIZEPOLICY_CAN_GROW, GridConstraints.SIZEPOLICY_FIXED, null, null, null, 0, false));
@@ -205,7 +211,7 @@ public class LoggerGUI extends JFrame {
         ircTitle.setHorizontalAlignment(0);
         ircTitle.setHorizontalTextPosition(0);
         ircTitle.setOpaque(true);
-        ircTitle.setText("Logs - IRC");
+        this.$$$loadLabelText$$$(ircTitle, this.$$$getMessageFromBundle$$$("lang", "logs.irc"));
         ircTitle.putClientProperty("html.disable", Boolean.TRUE);
         ircPanel.add(ircTitle, new GridConstraints(0, 0, 1, 2, GridConstraints.ANCHOR_CENTER, GridConstraints.FILL_NONE, 1, 1, null, null, null, 0, false));
         scrollBar1 = new JScrollBar();
@@ -220,16 +226,24 @@ public class LoggerGUI extends JFrame {
         ktorPanel.add(tabbedPane1, new GridConstraints(0, 0, 1, 1, GridConstraints.ANCHOR_CENTER, GridConstraints.FILL_BOTH, GridConstraints.SIZEPOLICY_CAN_SHRINK | GridConstraints.SIZEPOLICY_CAN_GROW, GridConstraints.SIZEPOLICY_CAN_SHRINK | GridConstraints.SIZEPOLICY_CAN_GROW, null, new Dimension(200, 200), null, 0, false));
         ktor_at = new JPanel();
         ktor_at.setLayout(new GridLayoutManager(1, 2, new Insets(0, 0, 0, 0), -1, -1));
-        tabbedPane1.addTab("Log - Ktor Main", ktor_at);
-        final JScrollPane scrollPane1 = new JScrollPane();
-        ktor_at.add(scrollPane1, new GridConstraints(0, 0, 1, 1, GridConstraints.ANCHOR_CENTER, GridConstraints.FILL_BOTH, GridConstraints.SIZEPOLICY_CAN_SHRINK | GridConstraints.SIZEPOLICY_WANT_GROW, GridConstraints.SIZEPOLICY_CAN_SHRINK | GridConstraints.SIZEPOLICY_WANT_GROW, null, null, null, 0, false));
-        ktorLog = new JTextArea();
-        scrollPane1.setViewportView(ktorLog);
+        tabbedPane1.addTab(this.$$$getMessageFromBundle$$$("lang", "log.ktor.main"), ktor_at);
+        ktor_MSP = new JScrollPane();
+        ktor_at.add(ktor_MSP, new GridConstraints(0, 0, 1, 1, GridConstraints.ANCHOR_CENTER, GridConstraints.FILL_BOTH, GridConstraints.SIZEPOLICY_CAN_SHRINK | GridConstraints.SIZEPOLICY_WANT_GROW, GridConstraints.SIZEPOLICY_CAN_SHRINK | GridConstraints.SIZEPOLICY_WANT_GROW, null, null, null, 0, false));
+        ktor_MLog = new JTextArea();
+        ktor_MLog.setLineWrap(true);
+        ktor_MSP.setViewportView(ktor_MLog);
         scrollBar2 = new JScrollBar();
         ktor_at.add(scrollBar2, new GridConstraints(0, 1, 1, 1, GridConstraints.ANCHOR_CENTER, GridConstraints.FILL_VERTICAL, GridConstraints.SIZEPOLICY_CAN_SHRINK | GridConstraints.SIZEPOLICY_CAN_GROW, GridConstraints.SIZEPOLICY_CAN_SHRINK | GridConstraints.SIZEPOLICY_CAN_GROW, null, null, null, 0, false));
         ktor_wsc = new JPanel();
-        ktor_wsc.setLayout(new GridLayoutManager(1, 1, new Insets(0, 0, 0, 0), -1, -1));
-        tabbedPane1.addTab("WSChat", ktor_wsc);
+        ktor_wsc.setLayout(new GridLayoutManager(1, 2, new Insets(0, 0, 0, 0), -1, -1));
+        tabbedPane1.addTab(this.$$$getMessageFromBundle$$$("lang", "log.ktorwschat"), ktor_wsc);
+        ktor_wscSP = new JScrollPane();
+        ktor_wscSP.setName("");
+        ktor_wsc.add(ktor_wscSP, new GridConstraints(0, 0, 1, 1, GridConstraints.ANCHOR_CENTER, GridConstraints.FILL_BOTH, GridConstraints.SIZEPOLICY_CAN_SHRINK | GridConstraints.SIZEPOLICY_WANT_GROW, GridConstraints.SIZEPOLICY_CAN_SHRINK | GridConstraints.SIZEPOLICY_WANT_GROW, null, null, null, 0, false));
+        ktor_wscLog = new JTextPane();
+        ktor_wscSP.setViewportView(ktor_wscLog);
+        scrollBar5 = new JScrollBar();
+        ktor_wsc.add(scrollBar5, new GridConstraints(0, 1, 1, 1, GridConstraints.ANCHOR_CENTER, GridConstraints.FILL_VERTICAL, GridConstraints.SIZEPOLICY_FIXED, GridConstraints.SIZEPOLICY_WANT_GROW, null, null, null, 0, false));
         todo1 = new JPanel();
         todo1.setLayout(new GridLayoutManager(3, 2, new Insets(0, 0, 0, 0), 0, 0));
         todo1.putClientProperty("html.disable", Boolean.TRUE);
@@ -261,10 +275,56 @@ public class LoggerGUI extends JFrame {
         scrollBar3.putClientProperty("html.disable", Boolean.TRUE);
         todo1.add(scrollBar3, new GridConstraints(1, 1, 2, 1, GridConstraints.ANCHOR_CENTER, GridConstraints.FILL_VERTICAL, 1, GridConstraints.SIZEPOLICY_CAN_SHRINK | GridConstraints.SIZEPOLICY_WANT_GROW, null, null, null, 0, false));
         discordLogR.setVerticalScrollBar(scrollBar4);
+        discordStatus.setLabelFor(ircLogR);
         ircLogR.setVerticalScrollBar(scrollBar1);
         ircTitle.setLabelFor(ircLog);
+        ktor_wscSP.setHorizontalScrollBar(scrollBar5);
         todo2.setVerticalScrollBar(scrollBar3);
         todo3.setLabelFor(todo4);
+    }
+
+    private static Method $$$cachedGetBundleMethod$$$ = null;
+
+    private String $$$getMessageFromBundle$$$(String path, String key) {
+        ResourceBundle bundle;
+        try {
+            Class<?> thisClass = this.getClass();
+            if ($$$cachedGetBundleMethod$$$ == null) {
+                Class<?> dynamicBundleClass = thisClass.getClassLoader().loadClass("com.intellij.DynamicBundle");
+                $$$cachedGetBundleMethod$$$ = dynamicBundleClass.getMethod("getBundle", String.class, Class.class);
+            }
+            bundle = (ResourceBundle) $$$cachedGetBundleMethod$$$.invoke(null, path, thisClass);
+        } catch (Exception e) {
+            bundle = ResourceBundle.getBundle(path);
+        }
+        return bundle.getString(key);
+    }
+
+    /**
+     * @noinspection ALL
+     */
+    private void $$$loadLabelText$$$(JLabel component, String text) {
+        StringBuffer result = new StringBuffer();
+        boolean haveMnemonic = false;
+        char mnemonic = '\0';
+        int mnemonicIndex = -1;
+        for (int i = 0; i < text.length(); i++) {
+            if (text.charAt(i) == '&') {
+                i++;
+                if (i == text.length()) break;
+                if (!haveMnemonic && text.charAt(i) != '&') {
+                    haveMnemonic = true;
+                    mnemonic = text.charAt(i);
+                    mnemonicIndex = result.length();
+                }
+            }
+            result.append(text.charAt(i));
+        }
+        component.setText(result.toString());
+        if (haveMnemonic) {
+            component.setDisplayedMnemonic(mnemonic);
+            component.setDisplayedMnemonicIndex(mnemonicIndex);
+        }
     }
 
     /**
@@ -273,4 +333,5 @@ public class LoggerGUI extends JFrame {
     public JComponent $$$getRootComponent$$$() {
         return mainPanel;
     }
+
 }

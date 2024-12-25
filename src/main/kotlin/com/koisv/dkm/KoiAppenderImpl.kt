@@ -41,7 +41,7 @@ class KoiAppenderImpl private constructor(
         val appendArea = when (name) {
             "KM-DBot" -> loggerGui.discordLog
             "IRC" -> loggerGui.ircLog
-            "KTor" -> loggerGui.ktorLog
+            "KTor" -> loggerGui.ktor_MLog
             else -> loggerGui.todo4
         }
 

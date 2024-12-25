@@ -1,4 +1,4 @@
-@file:OptIn(ExperimentalEncodingApi::class)
+@file:OptIn(ExperimentalEncodingApi::class, ExperimentalUuidApi::class, DelicateCoroutinesApi::class)
 package com.koisv.dkm
 
 import com.koisv.dkm.Main.execute
@@ -17,6 +17,7 @@ import org.apache.logging.log4j.LogManager
 import org.apache.logging.log4j.Logger
 import kotlin.coroutines.CoroutineContext
 import kotlin.io.encoding.ExperimentalEncodingApi
+import kotlin.uuid.ExperimentalUuidApi
 
 const val DEBUG_FLAG = "debug"
 
@@ -55,7 +56,7 @@ object Main : CoroutineScope {
         botData?.let {
             discord = KoiManager(it, args)
             mainLogger.info("디스코드 봇이 로드되었습니다. 디스코드 봇 실행 중...")
-            discord.start(noLogin = false)
+            discord.start(noLogin = args.contains("--no-login"))
         } ?: mainLogger.warn("디스코드 봇 로드 실패!")
         return true
     }

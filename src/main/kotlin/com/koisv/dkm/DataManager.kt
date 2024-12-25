@@ -20,8 +20,8 @@ import io.ktor.server.websocket.*
 import kotlinx.coroutines.*
 import kotlinx.datetime.Instant
 import kotlinx.datetime.LocalDateTime
-import kotlinx.datetime.toJavaInstant
 import kotlinx.datetime.toJavaLocalDateTime
+import kotlinx.datetime.toLocalDateTime
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.decodeFromStream
@@ -31,17 +31,20 @@ import java.math.BigInteger
 import java.security.KeyFactory
 import java.security.MessageDigest
 import java.security.spec.X509EncodedKeySpec
-import java.sql.Connection
-import java.sql.DriverManager
-import java.sql.ResultSet
-import java.sql.SQLException
-import java.sql.Types
+import java.sql.*
 import java.text.SimpleDateFormat
+import java.time.ZoneOffset
 import java.util.*
+import javax.crypto.BadPaddingException
 import javax.crypto.Cipher
+import javax.crypto.spec.GCMParameterSpec
+import javax.crypto.spec.SecretKeySpec
+import kotlin.io.encoding.Base64
 import kotlin.io.encoding.ExperimentalEncodingApi
+import kotlin.random.Random
 import kotlin.time.Duration.Companion.days
 import kotlin.time.Duration.Companion.minutes
+import kotlinx.datetime.TimeZone as KTimeZone
 
 @ExperimentalEncodingApi
 @OptIn(ExperimentalSerializationApi::class)
@@ -49,7 +52,7 @@ object DataManager {
     const val SQL_BATCH_SIZE = 100
 
     private val dGTName: String = "discord_guilds" + if (debug) "_t" else ""
-    private val sqlURL: String = "jdbc:mysql://" + (if (debug) "192.168.0.6" else "localhost") + ":3036/koimanager"
+    private val sqlURL: String = "jdbc:mysql://" + (if (debug) "192.168.0.6" else "192.168.0.5") + ":3036/koimanager"
     private val jdbcTimeFormat = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.KOREAN)
 
     val sqlCon: Connection = try {
@@ -93,18 +96,18 @@ object DataManager {
             var session: WebSocketServerSession? = null
         )
 
-        fun saveMsgHistory(form: Triple<Instant, WSCUser, Pair<String, WSCUser>>) {
+        fun saveMsgHistory(form: Triple<LocalDateTime, WSCUser, Pair<String, WSCUser?>>) {
             val tableName = if (debug) "wsc_history_t" else "wsc_history"
             val query = """
-                INSERT INTO $tableName (timestamp, senderId, message, receiverId)
+                INSERT INTO $tableName (time, sender_Id, content, recipient_id)
                 VALUES (?, ?, ?, ?)
             """.trimIndent()
 
             sqlCon.prepareStatement(query).use { statement ->
-                statement.setString(1, jdbcTimeFormat.format(Date.from(form.first.toJavaInstant())))
+                statement.setString(1, jdbcTimeFormat.format(Timestamp.valueOf(form.first.toJavaLocalDateTime())))
                 statement.setString(2, form.second.userId)
                 statement.setString(3, form.third.first)
-                statement.setString(4, form.third.second.userId)
+                statement.setString(4, form.third.second?.userId)
                 statement.executeUpdate()
                 sqlCon.commit()
             }
@@ -112,23 +115,33 @@ object DataManager {
 
         const val MAX_HISTORY_LIMIT = 50
 
-        fun loadMsgHistory(): List<Triple<Instant, WSCUser?, Pair<String, WSCUser?>>> {
+        fun loadMsgHistory(): List<Triple<LocalDateTime, WSCUser?, Pair<String, WSCUser?>>> {
             val tableName = if (debug) "wsc_history_t" else "wsc_history"
-            val query = "SELECT timestamp, senderId, message, receiverId FROM $tableName ORDER BY timestamp DESC LIMIT ?"
-
-            val history = mutableListOf<Triple<Instant, WSCUser?, Pair<String, WSCUser?>>>()
+            val query =
+                """(SELECT * FROM $tableName 
+                    WHERE RECIPIENT_ID IS NULL 
+                    ORDER BY TIME DESC LIMIT ?) UNION ALL 
+                    (SELECT * FROM $tableName 
+                    WHERE RECIPIENT_ID IS NOT NULL 
+                    ORDER BY TIME DESC LIMIT ?) ORDER BY TIME DESC""".trimMargin()
+            val history = mutableListOf<Triple<LocalDateTime, WSCUser?, Pair<String, WSCUser?>>>()
 
             sqlCon.prepareStatement(query).use { statement ->
                 statement.setInt(1, MAX_HISTORY_LIMIT)
+                statement.setInt(2, MAX_HISTORY_LIMIT)
                 statement.executeQuery().use { resultSet ->
                     while (resultSet.next()) {
-                        val timestamp = resultSet.getString("timestamp").let {
+                        val timestamp = resultSet.getString("time").let {
                             Instant.parse(it.replace(' ', 'T') + "Z")
                         }
-                        val senderId = resultSet.getString("senderId")
-                        val message = resultSet.getString("message")
-                        val receiverId = resultSet.getString("receiverId")
-                        history.add(Triple(timestamp, getWSCUser(senderId).firstOrNull(), Pair(message, getWSCUser(receiverId).firstOrNull())))
+                        val senderId = resultSet.getString("sender_id")
+                        val message = resultSet.getString("content")
+                        val receiverId = resultSet.getString("recipient_id")
+                        history.add(Triple(
+                            timestamp.toLocalDateTime(KTimeZone.currentSystemDefault()),
+                            getWSCUser(senderId).firstOrNull(),
+                            Pair(message, receiverId?.let { getWSCUser(it).firstOrNull() })
+                        ))
                     }
                 }
             }
@@ -138,29 +151,22 @@ object DataManager {
 
         fun saveWSCUser(user: WSCUser) {
             val tableName = if (debug) "wsc_users_t" else "wsc_users"
+            val mobileKey = if (user.conType == ConType.MOBILE) "pKey_M" else "pKey_D"
             val query = """
-                INSERT INTO $tableName (created, id, nickname, pKey_M, pKey_D, lastLogin_date)
-                VALUES (?, ?, ?, ?, ?, ?)
+                INSERT INTO $tableName (created, id, nickname, $mobileKey, lastLogin_date)
+                VALUES (?, ?, ?, ?, ?)
                 ON DUPLICATE KEY UPDATE 
                     nickname = VALUES(nickname),
-                    pKey_M = VALUES(pKey_M),
-                    pKey_D = VALUES(pKey_D),
+                    $mobileKey = VALUES($mobileKey),
                     lastLogin_date = VALUES(lastLogin_date)
             """.trimIndent()
 
             sqlCon.prepareStatement(query).use { statement ->
-                statement.setString(1, jdbcTimeFormat.format(Date.from(user.created.toJavaLocalDateTime().toInstant(java.time.ZoneOffset.UTC))))
+                statement.setString(1, jdbcTimeFormat.format(Timestamp.valueOf(user.created.toJavaLocalDateTime())))
                 statement.setString(2, user.userId)
                 statement.setString(3, user.nick)
-                if (user.conType == ConType.MOBILE) {
-                    statement.setString(4, user.encKey)
-                    statement.setNull(5, Types.VARCHAR)
-                } else {
-                    statement.setNull(4, Types.VARCHAR)
-                    statement.setString(5, user.encKey)
-                }
-                statement.setString(6, jdbcTimeFormat.format(Date.from(user.lastLogin.toJavaLocalDateTime().toInstant(java.time.ZoneOffset.UTC))))
-                statement.setString(7, user.conType.name)
+                statement.setString(4, user.encKey)
+                statement.setString(5, jdbcTimeFormat.format(Timestamp.valueOf(user.lastLogin.toJavaLocalDateTime())))
 
                 statement.executeUpdate()
                 sqlCon.commit()
@@ -180,7 +186,7 @@ object DataManager {
 
         fun getWSCUser(userId: String): ArrayList<WSCUser> {
             val tableName = if (debug) "wsc_users_t" else "wsc_users"
-            val query = "SELECT created, id, nickname, pKey_M, pKey_D, lastLogin_date FROM $tableName WHERE id = ?"
+            val query = "SELECT * FROM $tableName WHERE id = ?"
 
             sqlCon.prepareStatement(query).use { statement ->
                 statement.setString(1, userId)
@@ -300,7 +306,7 @@ object DataManager {
 
         fun updateDGuilds(data: List<GuildData>) {
             val query = """
-                INSERT INTO $dGTName (name, id, volume, shuffle, `repeat`, notify, update_channel)
+                INSERT INTO $dGTName (name, id, volume, shuffle, `repeat`, notify_channel, update_channel)
                 VALUES (?, ?, ?, ?, ?, ?, ?)
                 ON DUPLICATE KEY UPDATE
                     name = VALUES(name),
@@ -370,37 +376,94 @@ object DataManager {
     }
 
     fun String.hash(): String {
-        val md: MessageDigest = MessageDigest.getInstance("SHA-512")
+        val md = MessageDigest.getInstance("SHA-512")
         val messageDigest = md.digest(toByteArray())
 
         val no = BigInteger(1, messageDigest)
-
-        var hashText: String = no.toString(16)
-
+        var hashText = no.toString(16)
         while (hashText.length < 32) hashText = "0$hashText"
 
         return hashText
     }
 
-    fun String.decryptWithRSA(encodedKey: String): String {
-        val rawKey = kotlin.io.encoding.Base64.decode(encodedKey)
+    fun String.decryptWithRSA(pubKey: String): String? {
+        val rawKey = Base64.decode(pubKey)
         val spec = X509EncodedKeySpec(rawKey)
         val fact = KeyFactory.getInstance("RSA")
         val pubKey = fact.generatePublic(spec)
 
-        val cipher = Cipher.getInstance("RSA")
-        cipher.init(Cipher.DECRYPT_MODE, pubKey)
-        return String(cipher.doFinal(kotlin.io.encoding.Base64.decode(this)))
+        try {
+            val cipher = Cipher.getInstance("RSA")
+            cipher.init(Cipher.DECRYPT_MODE, pubKey)
+            return String(cipher.doFinal(Base64.decode(this)))
+        } catch (_: BadPaddingException) {
+            return null
+        }
     }
 
-    fun String.encryptWithRSA(privateKey: String): String {
-        val rawKey = kotlin.io.encoding.Base64.decode(privateKey)
+    fun String.encryptWithRSA(pubKey: String): String? {
+        val rawKey = Base64.decode(pubKey)
         val spec = X509EncodedKeySpec(rawKey)
         val fact = KeyFactory.getInstance("RSA")
-        val prvKey = fact.generatePrivate(spec)
+        val prvKey = fact.generatePublic(spec)
 
-        val cipher = Cipher.getInstance("RSA")
-        cipher.init(Cipher.ENCRYPT_MODE, prvKey)
-        return kotlin.io.encoding.Base64.encode(cipher.doFinal(this.toByteArray()))
+        return try {
+            val cipher = Cipher.getInstance("RSA")
+            cipher.init(Cipher.ENCRYPT_MODE, prvKey)
+            Base64.encode(cipher.doFinal(this.toByteArray()))
+        } catch (_: BadPaddingException) {
+            null
+        }
+    }
+
+    fun String.compressEncRSA(pubKey: String): String? {
+        val password = passcodeGen(16)
+        val (secretKeySpec, gcmParamSpec) = getSpec(password)
+
+        val cipher = Cipher.getInstance("AES/GCM/NoPadding")
+        cipher.init(Cipher.ENCRYPT_MODE, secretKeySpec, gcmParamSpec)
+
+        val encryptedValue = cipher.doFinal(this.toByteArray())
+
+        return ("%%${password.encryptWithRSA(pubKey)}~" + Base64.encode(encryptedValue))
+    }
+
+    fun String.compressDecRSA(pubKey: String): String? {
+        if (!this.startsWith("%%")) return null
+        val data = this.substringAfter('~')
+        val password = this.substringAfter("%%").substringBefore('~')
+            .decryptWithRSA(pubKey) ?: return null
+
+        val (secretKeySpec, gcmParamSpec) = getSpec(password)
+
+        val cipher = Cipher.getInstance("AES/GCM/NoPadding")
+        cipher.init(Cipher.DECRYPT_MODE, secretKeySpec, gcmParamSpec)
+
+        val decryptedByteValue = cipher.doFinal(Base64.decode(data))
+        return String(decryptedByteValue)
+    }
+
+    fun getSpec(password: String): Pair<SecretKeySpec, GCMParameterSpec> {
+        val secretKeySpec = SecretKeySpec(password.toByteArray(), "AES")
+        val iv = ByteArray(16)
+        val charArray = password.toCharArray()
+        for (i in 0 until charArray.size) {
+            iv[i] = charArray[i].code.toByte()
+        }
+        val gcmParamSpec = GCMParameterSpec(128, iv)
+        return Pair(secretKeySpec, gcmParamSpec)
+    }
+
+    fun passcodeGen(len: Int): String {
+        val alphabet: List<Char> = ('가'..'힣').toList()
+        val pre = buildString {
+            for (i in 0 until (len-1)/3) {
+                append(alphabet.random())
+            }
+        }
+        val rand = Random(java.time.LocalDateTime.now().toEpochSecond(ZoneOffset.UTC))
+        return pre.toMutableList()
+            .apply { add(rand.nextInt(0, pre.length + 1), "${rand.nextInt(0, 9)}".toCharArray()[0]) }
+            .joinToString("")
     }
 }

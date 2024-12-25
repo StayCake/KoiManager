@@ -2,14 +2,13 @@
 /.gradle/
 /.idea/
 /build/
-/guildConf/
 /ignore/
 /.kotlin/
 /fileConverter/
-/config/
-/data/
 /logs/
-token.json
+/sessionKeys/
+
+config.ini
 # Compiled class file
 *.class
 
