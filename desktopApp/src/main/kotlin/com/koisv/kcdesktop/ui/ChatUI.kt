@@ -5,6 +5,7 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.desktop.ui.tooling.preview.Preview
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -22,19 +23,30 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.*
 import androidx.compose.ui.text.TextRange
-import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.navigation.NavHostController
+import com.koisv.kcdesktop.Nav
 import com.koisv.kcdesktop.WSHandler
 import com.koisv.kcdesktop.WSHandler.loggedInWith
 import com.koisv.kcdesktop.WSHandler.messages
+import com.koisv.kcdesktop.WSHandler.myKey
 import com.koisv.kcdesktop.WSHandler.onlines
+import com.koisv.kcdesktop.config
+import com.koisv.kcdesktop.ui.MainUI.ConfirmDialog
 import com.koisv.kcdesktop.ui.MainUI.SlideInSnackbar
+import com.koisv.kcdesktop.ui.MainUI.UserCTXMenu
+import com.koisv.kcdesktop.ui.MainUI.logoutDialog
+import com.koisv.kcdesktop.ui.MainUI.message
+import com.koisv.kcdesktop.ui.MainUI.progressText
+import com.koisv.kcdesktop.ui.MainUI.progressVisible
 import com.koisv.kcdesktop.ui.MainUI.showSnackbar
+import com.koisv.kcdesktop.ui.MainUI.showUsers
 import com.koisv.kcdesktop.ui.MainUI.snackbarText
 import com.koisv.kcdesktop.ui.Tools.chatTimeFormat
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.DelicateCoroutinesApi
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.time.Duration
@@ -50,7 +62,23 @@ object ChatUI {
         visibilityThreshold = 0.1f
     )
 
-    private var message by mutableStateOf(TextFieldValue(""))
+    fun returnToLogin(nav: NavHostController, coroutineScope: CoroutineScope, isLogout: Boolean = false) {
+        LoginUI.logout = true
+        if (isLogout) {
+            logoutDialog = false
+            progressText = "로그아웃 중..."
+        }
+            progressVisible = true
+        if (isLogout) coroutineScope.launch { WSHandler.sendLogout() }
+        loggedInWith = null
+        myKey = null
+        onlines.clear()
+        nav.navigate(Nav.LOGIN.name) { popUpTo(Nav.LOGIN.name) { inclusive = true } }
+        if (isLogout) {
+            snackbarText = "로그아웃 되었습니다."
+            showSnackbar = true
+        }
+    }
 
     fun heightCalculate(current: Dp, target: String): Dp =
         if (current >= 148.dp && target.lines().size > 6) 148.dp
@@ -104,18 +132,30 @@ object ChatUI {
                 verticalArrangement = Arrangement.spacedBy(4.dp),
             ) {
                 for (user in onlines) {
+                    var showContextMenu by remember { mutableStateOf(false) }
                     val onlineTime = mutableStateOf(getRelativeTime(user.lastOnline))
-                    Row {
+                    Row (
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .clickable { showContextMenu = !showContextMenu }
+                    ) {
                         if (user.onMobile) Icon(
                             Icons.Default.PhoneAndroid,
                             contentDescription = "모바일",
-                            modifier = Modifier.padding(start = 4.dp)
+                            modifier = Modifier
+                                .padding(start = 4.dp)
+                                .fillMaxHeight()
                         ) else Icon(
                             Icons.Default.Computer,
                             contentDescription = "PC",
-                            modifier = Modifier.padding(start = 4.dp)
+                            modifier = Modifier
+                                .padding(start = 4.dp)
+                                .fillMaxHeight()
                         )
-                        Column {
+                        Column (
+                            modifier = Modifier
+                                .padding(start = 4.dp)
+                        ) {
                             Text(
                                 if (user.nickname == null) user.id else "${user.nickname} [${user.id}]",
                                 modifier = Modifier.padding(start = 6.dp),
@@ -126,6 +166,7 @@ object ChatUI {
                                 modifier = Modifier.padding(start = 6.dp, top = 2.dp),
                                 fontSize = (10 * userLSize).sp
                             )
+                            UserCTXMenu(showContextMenu, user) { showContextMenu = false }
                         }
                     }
                     Divider(color = Color(0, 100, 0, 200), thickness = 1.dp)
@@ -134,17 +175,25 @@ object ChatUI {
         }
     }
 
+    @OptIn(DelicateCoroutinesApi::class)
     @Preview
     @Composable
-    fun ChatScreen() {
-        var showUsers by remember { mutableStateOf(false) }
+    fun ChatScreen(nav: NavHostController) {
+        var connectionFailMsg by remember { mutableStateOf("연결이 끊어졌습니다...") }
         val coroutineScope = rememberCoroutineScope()
         Scaffold(
             topBar = {
                 TopAppBar(
                     backgroundColor = Color(100, 230, 100, 220),
                     title = { Text(
-                        "온라인 | ${loggedInWith.nickname ?: loggedInWith.id} | 접속자 수: ${onlines.size}"
+                        buildString {
+                            append(if (!MainUI.disconnectedUI) "온라인" else "연결 끊김")
+                            append(" | ")
+                            append(loggedInWith?.nickname ?: loggedInWith?.id)
+                            append(" | ")
+                            append(onlines.size)
+                            append(" 명 접속 중")
+                        }
                     ) },
                     actions = {
                         IconButton(onClick = { showUsers = !showUsers }) {
@@ -154,6 +203,16 @@ object ChatUI {
                 )
             }
         ) {
+            ConfirmDialog(
+                title = "로그아웃",
+                text = "정말 로그아웃 하시겠습니까?",
+                open = logoutDialog,
+                onClose = { logoutDialog = false },
+                onConfirm = { returnToLogin(nav, coroutineScope, true) }
+            )
+            MainUI.ProgressAlert(progressVisible, progressText)
+            MainUI.ProgressAlert(MainUI.disconnectedUI, connectionFailMsg)
+
             Row(modifier = Modifier.fillMaxSize()) {
                 val userLSize: Float by animateFloatAsState(
                     targetValue = if (showUsers) 0.2f else 0f,
@@ -249,6 +308,45 @@ object ChatUI {
                     showSnackbar = false
                 }
             }
+            LaunchedEffect(MainUI.disconnectedUI) {
+                if (MainUI.disconnectedUI) {
+                    val maxReconnect = config.getProperty("maxReconnect")?.toIntOrNull()
+                    connectionFailMsg = "연결이 끊어졌습니다... 재접속 시도 중..."
+                    var retry = 0
+                    var connected = false
+                    while (
+                        WSHandler.sessionFailed == true &&
+                        retry < (maxReconnect ?: 5) &&
+                        !connected
+                    ) {
+                        connected = Tools.getConnected()
+                        connectionFailMsg = """연결이 끊어졌습니다...
+                                          |재접속 시도 중... ${++retry}/$maxReconnect""".trimMargin()
+                        delay(3000)
+                    }
+                    if (connected) {
+                        connectionFailMsg = "접속 완료. 다시 로그인 하는 중..."
+                        println("Reconnected!")
+                        while (!Tools.getConnected()) { 0 }
+                        val result = WSHandler.sendLogin(MainUI.id, WSHandler.myKeyFile)
+                        println("Login result: $result")
+                        if (result != 0) {
+                            returnToLogin(nav, coroutineScope)
+                            snackbarText = "로그인에 실패했습니다. 재시도 해주세요."
+                            showSnackbar = true
+                        } else {
+                            snackbarText = "접속 완료!"
+                            showSnackbar = true
+                        }
+                        MainUI.disconnectedUI = false
+                    } else {
+                        returnToLogin(nav, coroutineScope)
+                        snackbarText = "연결에 실패했습니다. 인터넷 연결 상태를 점검해 주세요."
+                        showSnackbar = true
+                        MainUI.disconnectedUI = false
+                    }
+                }
+            }
         }
     }
-    }
+}

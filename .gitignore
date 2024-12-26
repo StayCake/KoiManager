@@ -7,6 +7,13 @@
 /fileConverter/
 /logs/
 /sessionKeys/
+/desktopApp/gradle/
+/desktopApp/build/
+/desktopApp/.gradle/
+/desktopApp/.idea/
+/out/
+/desktopApp/out/
+/desktopApp/.kotlin/
 
 config.ini
 # Compiled class file

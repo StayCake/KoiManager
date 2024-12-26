@@ -38,8 +38,6 @@ object WSHandler {
     )
 
     lateinit var wsSession: ClientWebSocketSession
-    lateinit var loggedInWith: WSCUser
-    lateinit var myKey: PrivateKey
     lateinit var myKeyFile: File
 
     var keyUpdated = false
@@ -47,9 +45,11 @@ object WSHandler {
     var autoLogin by mutableStateOf(false)
     var autoLoginId by mutableStateOf("")
     val responses = mutableMapOf<String, Any>()
+    var loggedInWith: WSCUser? = null
+    var myKey: PrivateKey? = null
 
-    val sessionOpened get() = ::wsSession.isInitialized
-    val loggedIn get() = ::loggedInWith.isInitialized
+    val sessionOpened get() = ::wsSession.isInitialized && wsSession.isActive
+    val loggedIn get() = loggedInWith != null
     val loggedInState by mutableStateOf(loggedIn)
     val wsClient = HttpClient(CIO) { install(WebSockets) }
     val sessionKeyFolder = File("./sessionKeys")
@@ -78,8 +78,10 @@ object WSHandler {
     // 0: Success, 1: No user, 2: Same user, 3: No permission, 4: Timeout
     suspend fun sendRegister(id: String, nickname: String?, otp: String): Short = coroutineScope {
         if (!sessionOpened) return@coroutineScope 99
-        wsSession.send(Frame.Text("wsc:register||${otp.hash()}.0.$id${nickname?.let { ".$it" } ?: ""}"))
+        println("Sending register request")
         val response = withTimeoutOrNull(5000) {
+            wsSession.send(Frame.Text("wsc:register||${otp.hash()}.0.$id${nickname?.let { ".$it" } ?: ""}"))
+            println("Sent register request")
             while (!responses.containsKey("register") && isActive) { 0 }
             try { responses.remove("register") as? Int }
             catch (_: Exception) { false }
@@ -93,16 +95,20 @@ object WSHandler {
             }
             1 -> 3
             2 -> 4
+            3 -> 3
             else -> 1
         }
     }
 
     // 0: Success, 1: No user, 2: Same user, 3: No permission, 4: Timeout, 5: Exception
     suspend fun sendLogin(id: String, key: File): Int = coroutineScope {
+        println("Login: $id, $sessionOpened, $sessionFailed")
         if (!sessionOpened) return@coroutineScope 5
         myKeyFile = key
-        wsSession.send(Frame.Text("wsc:login||$id.0.${id.encryptWithRSA(key.readBytes().toPrvKey())}"))
+        myKey = myKeyFile.readBytes().toPrvKey()
+        println("Sending login request")
         val response = withTimeoutOrNull(5000) {
+            wsSession.send(Frame.Text("wsc:login||$id.0.${id.encryptWithRSA(key.readBytes().toPrvKey())}"))
             while (!responses.containsKey("login") && isActive) { 0 }
             try { responses.remove("login") as? Int }
             catch (e: Exception) {
@@ -114,15 +120,25 @@ object WSHandler {
             myKey = responses.remove("key_login") as? PrivateKey ?: return@coroutineScope 1
             keyUpdated = true
             0
-        } else response
+        } else {
+            if (!keyUpdated) myKey = null
+            response
+        }
+    }
+
+    suspend fun sendLogout(): Boolean {
+        if (!sessionOpened) return false
+        wsSession.send(Frame.Text("wsc:logout"))
+        return true
     }
 
     suspend fun sendMessage(message: String, receiver: String? = null): Boolean {
         if (!sessionOpened) return false
+        val key = myKey ?: return false
         val messageData = buildString {
             append("wsc:chat||")
-            append(message.compressEncRSA(myKey))
-            receiver?.let{ append("." + it.encryptWithRSA(myKey)) }
+            append(message.compressEncRSA(key))
+            receiver?.let{ append("." + it.encryptWithRSA(key)) }
         }
 
         wsSession.send(Frame.Text(messageData))
@@ -140,11 +156,15 @@ object WSHandler {
                 wsSession = this
                 sessionFailed = false
                 channelHandler(incoming, outgoing)
+                sessionFailed = true
+                MainUI.disconnectedUI = true
             }
             else wsClient.wss(host = "ws.koisv.com", path = "/", port = 443) {
                 wsSession = this
                 sessionFailed = false
                 channelHandler(incoming, outgoing)
+                sessionFailed = true
+                MainUI.disconnectedUI = true
             }
         } catch (e: Exception) {
             e.printStackTrace()
@@ -164,10 +184,12 @@ object WSHandler {
                             val action = data[0].replace("wsc:", "")
                             println("Action: $action")
                             println("Data: ${data.joinToString("\n")}")
+                            val key = myKey
                             when (action) {
                                 "status" -> {
                                     while (!keyUpdated) { 0 }
-                                    val decoded = data[1].compressDecRSA(myKey) ?:
+                                    if (key == null) return
+                                    val decoded = data[1].compressDecRSA(key) ?:
                                     throw AuthenticationException("Failed to decrypt status")
                                     val rawUsers = decoded.split("|")
                                     val result = mutableListOf<WSCUser>()
@@ -181,7 +203,7 @@ object WSHandler {
                                     }
                                     onlines.clear()
                                     onlines.addAll(result)
-                                    onlines.addFirst(onlines.removeAt(onlines.indexOfFirst { it.id == loggedInWith.id }))
+                                    onlines.addFirst(onlines.removeAt(onlines.indexOfFirst { it.id == loggedInWith?.id }))
                                 }
                                 "last_login" -> {
                                     val lastOnline = data[1]
@@ -190,14 +212,15 @@ object WSHandler {
                                         MainUI.id, nickname,
                                         LocalDateTime.parse(lastOnline), onMobile = false
                                     )
-                                    onlines.add(loggedInWith)
+                                    loggedInWith?.let { onlines.add(it) }
                                 }
                                 "private_key_send" -> {
                                     progressText = "키 발급 중..."
                                     if (data.getOrNull(2) == "1") {
+                                        if (key == null) return
                                         myKey = myKeyFile.readBytes().toPrvKey()
                                         try { myKeyFile.delete() } catch (_: Exception) { }
-                                        val key = data[1].compressDecRSA(myKey) ?:
+                                        val key = data[1].compressDecRSA(key) ?:
                                         throw AuthenticationException("Failed to decrypt key")
                                         println("Key: $key")
                                         myKeyFile.createNewFile()
@@ -215,14 +238,14 @@ object WSHandler {
                                     }
                                 }
                                 "message" -> {
-                                    if (loggedIn) {
+                                    if (loggedIn && key != null) {
                                         println("Message: ${data[2]}")
                                         try {
                                             val (sender, timestamp, message) =
                                                 Triple(
-                                                    data[1].decryptWithRSA(myKey) ?: throw AuthenticationException("Failed to decrypt message"),
+                                                    data[1].decryptWithRSA(key) ?: throw AuthenticationException("Failed to decrypt message"),
                                                     LocalDateTime.parse(data[3]),
-                                                    data[2].compressDecRSA(myKey) ?: throw AuthenticationException("Failed to decrypt message")
+                                                    data[2].compressDecRSA(key) ?: throw AuthenticationException("Failed to decrypt message")
                                                 )
                                             println("Message: $message")
                                             messages.add(Triple(sender, timestamp, Pair(message, null)))
@@ -233,14 +256,14 @@ object WSHandler {
                                     }
                                 }
                                 "message_prv" -> {
-                                    if (loggedIn) {
+                                    if (loggedIn && key != null) {
                                         val (sender, timestamp, message) =
                                             Triple(
-                                                data[1].decryptWithRSA(myKey) ?: throw AuthenticationException("Failed to decrypt message"),
+                                                data[1].decryptWithRSA(key) ?: throw AuthenticationException("Failed to decrypt message"),
                                                 LocalDateTime.parse(data[3]),
-                                                data[2].compressDecRSA(myKey) ?: throw AuthenticationException("Failed to decrypt message")
+                                                data[2].compressDecRSA(key) ?: throw AuthenticationException("Failed to decrypt message")
                                             )
-                                        messages.add(Triple(sender, timestamp, Pair(message, loggedInWith.nickname)))
+                                        messages.add(Triple(sender, timestamp, Pair(message, loggedInWith?.nickname)))
                                     }
                                 }
                             }
@@ -252,6 +275,7 @@ object WSHandler {
                                 "register_success" -> responses["register"] = 0
                                 "register_fail_same_user" -> responses["register"] = 1
                                 "register_fail_nickname" -> responses["register"] = 2
+                                "register_fail_no_permission" -> responses["register"] = 3
                                 "login_success" -> responses["login"] = 0
                                 "login_fail_no_user" -> responses["login"] = 1
                                 "login_fail_same_user" -> responses["login"] = 2

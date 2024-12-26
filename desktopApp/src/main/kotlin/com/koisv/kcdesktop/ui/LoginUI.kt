@@ -3,11 +3,13 @@ package com.koisv.kcdesktop.ui
 import androidx.compose.desktop.ui.tooling.preview.Preview
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.AbsoluteRoundedCornerShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.*
@@ -16,6 +18,7 @@ import androidx.compose.ui.unit.dp
 import androidx.navigation.NavHostController
 import com.koisv.kcdesktop.WSHandler
 import com.koisv.kcdesktop.WSHandler.autoLogin
+import com.koisv.kcdesktop.WSHandler.loggedInWith
 import com.koisv.kcdesktop.WSHandler.sendRegister
 import com.koisv.kcdesktop.WSHandler.sessionOpened
 import com.koisv.kcdesktop.config
@@ -37,7 +40,6 @@ import com.koisv.kcdesktop.ui.MainUI.progressVisible
 import com.koisv.kcdesktop.ui.MainUI.showSnackbar
 import com.koisv.kcdesktop.ui.MainUI.smallPadding
 import com.koisv.kcdesktop.ui.MainUI.snackbarText
-import com.koisv.kcdesktop.ui.MainUI.transparentColor
 import com.koisv.kcdesktop.ui.Tools.getConnected
 import kotlinx.coroutines.DelicateCoroutinesApi
 import kotlinx.coroutines.async
@@ -52,6 +54,9 @@ object LoginUI {
 
     var buttonFor by mutableStateOf("접속 중...")
     var inputEnabled by mutableStateOf(false)
+    var buttonEnabled by mutableStateOf(false)
+
+    var logout by mutableStateOf(false)
 
     @OptIn(DelicateCoroutinesApi::class)
     suspend fun otpUIProgress() {
@@ -85,23 +90,16 @@ object LoginUI {
                         verticalAlignment = Alignment.Top,
                         horizontalArrangement = Arrangement.End,
                     ) {
-                        Button(
-                            onClick = {
-                                isRegister = false
-                                loginAlert = false
-                                buttonFor = if (sessionOpened) "로그인" else "재접속"
-                            },
-                            colors = ButtonDefaults.buttonColors(backgroundColor = transparentColor)
-                        ) { Text("로그인") }
-                        Button(
-                            onClick = {
-                                isRegister = true
-                                loginAlert = false
-                                coroutineScope.launch { otpUIProgress() }
-                                buttonFor = if (sessionOpened) "회원가입" else "재접속"
-                            },
-                            colors = ButtonDefaults.buttonColors(backgroundColor = transparentColor)
-                        ) { Text("회원가입") }
+                        MainUI.TransparentButton("로그인") {
+                            isRegister = false
+                            loginAlert = false
+                            buttonFor = if (sessionOpened) "로그인" else "재접속" }
+                        MainUI.TransparentButton("회원가입") {
+                            id = ""
+                            isRegister = true
+                            loginAlert = false
+                            coroutineScope.launch { otpUIProgress() }
+                            buttonFor = if (sessionOpened) "회원가입" else "재접속" }
                     }
 
                 },
@@ -117,8 +115,6 @@ object LoginUI {
     @Preview
     fun Authenticate(keys: List<File>, nav: NavHostController) {
         val coroutineScope = rememberCoroutineScope()
-        var buttonEnabled by remember { mutableStateOf(false) }
-
         val fcMan = LocalFocusManager.current
 
         MaterialTheme {
@@ -196,8 +192,14 @@ object LoginUI {
                             }
                         )
                     }
-                    Row(modifier = smallPadding) {
+                    Row(
+                        modifier = smallPadding,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
                         Button(
+                            modifier = checkboxPadding
+                                .shadow(4.dp, AbsoluteRoundedCornerShape(8.dp), clip = true)
+                                .height(36.dp),
                             onClick = {
                                 progressText = when (buttonFor) {
                                     "OTP 다시 요청" -> "OTP 요청 중..."
@@ -207,6 +209,11 @@ object LoginUI {
                                 }
                                 progressVisible = true
                             },
+                            colors = ButtonDefaults.outlinedButtonColors(
+                                backgroundColor = Color(33, 114, 33, 220),
+                                contentColor = Color(195, 243, 195, 220)
+                            ),
+                            shape = AbsoluteRoundedCornerShape(8.dp),
                             enabled = buttonEnabled
                         ) { Text(buttonFor) }
                         Checkbox(
@@ -243,7 +250,10 @@ object LoginUI {
 
         LaunchedEffect(progressVisible) {
             suspend fun loginNext() {
-                val loginResult = keys.map { Pair(it, WSHandler.sendLogin(id, it)) }
+                println("Login next")
+                val loginResult = keys.map { Pair(it, WSHandler.sendLogin(id, it)) }.also {
+                    println("Login result: $it")
+                }
 
                 if (loginResult.any { it.second == 0 } ) {
                     val confingStream = FileOutputStream("config.ini")
@@ -254,12 +264,12 @@ object LoginUI {
 
                     nav.navigate("chat") {
                         launchSingleTop = true
-                        popUpTo("login") { inclusive = true }
+                        popUpTo("chat") { inclusive = true }
                     }
                 }
                 snackbarText =
                     when {
-                        loginResult.any { it.second == 0 } -> "로그인 완료! 환영합니다, ${WSHandler.loggedInWith.nickname ?: WSHandler.loggedInWith.id}님."
+                        loginResult.any { it.second == 0 } -> "로그인 완료! 환영합니다, ${loggedInWith?.nickname ?: loggedInWith?.id}님."
                         loginResult.any { it.second == 2 } -> "로그인 실패! 이미 로그인 된 아이디입니다."
                         else -> "로그인 실패! 아이디, 키 파일을 점검하거나 관리자에게 문의 바랍니다."
                     }
@@ -270,13 +280,21 @@ object LoginUI {
             }
 
             if (progressVisible) {
-                when (buttonFor) {
+                if (logout) {
+                    nickname = ""
+                    otp = ""
+                    buttonFor = "대기 중..."
+                    loginAlert = true
+                    buttonEnabled = true
+                    logout = false
+                    progressVisible = false
+                } else when (buttonFor) {
                     "가입하기" -> {
                         val result = sendRegister(id, if (nickname.isNotBlank()) nickname else null, otp)
                         if (result == 0.toShort()) {
                             nav.navigate("chat") {
                                 launchSingleTop = true
-                                popUpTo("login") { inclusive = true }
+                                popUpTo("chat") { inclusive = true }
                             }
                         }
                         when (result) {
@@ -313,8 +331,10 @@ object LoginUI {
                                 else -> {
                                     buttonFor = "로그인"
                                     inputEnabled = true
-                                    snackbarText = "서버 연결 완료! 로그인 하세요."
-                                    showSnackbar = true
+                                    if (buttonFor == "재접속") {
+                                        snackbarText = "서버 연결 완료! 로그인 하세요."
+                                        showSnackbar = true
+                                    }
                                     progressVisible = false
                                 }
                             }

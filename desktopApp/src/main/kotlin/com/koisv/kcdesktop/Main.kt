@@ -42,6 +42,7 @@ fun main(args: Array<String>) = application {
 
         prop.setProperty("autoLogin", "false")
         prop.setProperty("autoLoginId", "")
+        prop.setProperty("maxReconnect", "5")
 
         prop.store(java.io.FileWriter("config.ini"), "KoiChat Desktop Client Config")
     }
@@ -51,6 +52,7 @@ fun main(args: Array<String>) = application {
         onCloseRequest = {
             if (loggedInState) {
                 coroutine.launch {
+                    WSHandler.sendLogout()
                     WSHandler.wsSession.close(
                         CloseReason(CloseReason.Codes.NORMAL, "Client closed")
                     )
@@ -81,7 +83,7 @@ fun main(args: Array<String>) = application {
             startDestination = Nav.LOGIN.name
         ) {
             composable(Nav.LOGIN.name) { LoginUI.Authenticate(keys, nav) }
-            composable(Nav.CHAT.name) { ChatUI.ChatScreen() }
+            composable(Nav.CHAT.name) { ChatUI.ChatScreen(nav) }
         }
     }
 }

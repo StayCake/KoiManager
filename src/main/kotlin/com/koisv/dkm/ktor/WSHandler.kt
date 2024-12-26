@@ -214,7 +214,7 @@ object WSHandler {
                     WSChat.WSCUser(
                         Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault()),
                         userId, nickName, Base64.encode(userKey.public.encoded),
-                        conType, Clock.System.now().toLocalDateTime(TimeZone.UTC), session
+                        conType, Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault()), session
                     )
                 WSChat.saveWSCUser(newUser)
                 WSChat.online.add(newUser)
@@ -227,7 +227,6 @@ object WSHandler {
 
         suspend fun handleEncryptedMessage(
             encryptedMessage: String,
-            session: WebSocketServerSession,
             recipientUser: String?
         ): ConResult {
             return try {
@@ -312,7 +311,7 @@ object WSHandler {
          * code_gen_successful
          * recovery_success
          * forbidden_nickname
-         * register_[success|fail_nickname|fail_same_user]
+         * register_[success|fail_nickname|fail_same_user|fail_no_permission]
          * login_[success|fail_no_user|fail_same_user|fail_no_permission|fail_blocked]
          * logout_[success|fail_no_user|fail_no_permission]
          * nick_change_[success|fail_no_user|fail_no_permission]
@@ -368,6 +367,7 @@ object WSHandler {
                     else {
                         val result = currentSession.registerUser(conType, otpCodeInput, userId, nickName, this)
                         if (result == DONE) outgoing.send(Frame.Text("wsc:register_success"))
+                        else outgoing.send(Frame.Text("wsc:register_fail_no_permission"))
                     }
                 }
                 "login" -> {
@@ -407,7 +407,7 @@ object WSHandler {
                     val encryptedMessage = params[0]
                     val prvTarget = params.getOrNull(1)?.ifBlank { null }
                     val messageProcessResult =
-                        currentSession.handleEncryptedMessage(encryptedMessage, this, prvTarget)
+                        currentSession.handleEncryptedMessage(encryptedMessage, prvTarget)
 
                     when (messageProcessResult) {
                         DONE -> outgoing.send(Frame.Text("wsc:send_success"))
