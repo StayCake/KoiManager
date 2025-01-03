@@ -44,7 +44,7 @@ dependencies {
     implementation("io.ktor:ktor-server-core-jvm:$ktorVer")
     implementation("io.ktor:ktor-server-auth-jvm:$ktorVer")
     implementation("io.ktor:ktor-server-sessions-jvm:$ktorVer")
-    implementation("io.ktor:ktor-server-netty-jvm:$ktorVer")
+    implementation("io.ktor:ktor-server-jetty-jakarta:$ktorVer")
     implementation("io.ktor:ktor-server-websockets:$ktorVer")
     implementation("io.ktor:ktor-network:$ktorVer")
     implementation("io.ktor:ktor-network-tls:$ktorVer")

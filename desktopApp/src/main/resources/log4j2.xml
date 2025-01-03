@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration status="WARN">
+    <appenders>
+        <!-- Koi Appender -->
+        <Console name="console" target="SYSTEM_ERR">
+            <PatternLayout pattern="%d{HH:mm:ss.SSS} | [%thread] %-5level %logger{36} | %msg%n"/>
+        </Console>
+
+        <!-- Backup Log File -->
+        <RollingFile name="file" fileName="logs/latest.log"
+                     filePattern="logs/Log_%d{yyMMdd}_%i.log">
+            <PatternLayout pattern="[%-5p] %d{HH:mm:ss} [%C] - %m%n"/>
+            <Policies>
+                <SizeBasedTriggeringPolicy size="10MB"/>
+                <TimeBasedTriggeringPolicy interval="1"/>
+            </Policies>
+            <DefaultRolloverStrategy max="50" fileIndex="min"/>
+        </RollingFile>
+    </appenders>
+    <loggers>
+        <!-- Root Logger Configuration -->
+        <root level="debug">
+            <appender-ref ref="file"/>
+            <appender-ref ref="console"/>
+        </root>
+    </loggers>
+</configuration>

@@ -14,6 +14,7 @@ import com.koisv.dkm.irc.IRCChannelImpl.IRCChannel
 import com.koisv.dkm.irc.IRCConfig
 import com.koisv.dkm.irc.IRCConfig.IRCCredentials
 import com.koisv.dkm.irc.IRCModeImpl
+import com.koisv.dkm.ktor.WSHandler
 import dev.kord.common.annotation.KordVoice
 import dev.kord.common.entity.Snowflake
 import io.ktor.server.websocket.*
@@ -44,6 +45,7 @@ import kotlin.io.encoding.ExperimentalEncodingApi
 import kotlin.random.Random
 import kotlin.time.Duration.Companion.days
 import kotlin.time.Duration.Companion.minutes
+import kotlin.uuid.ExperimentalUuidApi
 import kotlinx.datetime.TimeZone as KTimeZone
 
 @ExperimentalEncodingApi
@@ -115,6 +117,7 @@ object DataManager {
 
         const val MAX_HISTORY_LIMIT = 50
 
+        @OptIn(ExperimentalUuidApi::class, DelicateCoroutinesApi::class)
         fun loadMsgHistory(): List<Triple<LocalDateTime, WSCUser?, Pair<String, WSCUser?>>> {
             val tableName = if (debug) "wsc_history_t" else "wsc_history"
             val query =
@@ -138,8 +141,9 @@ object DataManager {
                         val message = resultSet.getString("content")
                         val receiverId = resultSet.getString("recipient_id")
                         history.add(Triple(
-                            timestamp.toLocalDateTime(KTimeZone.currentSystemDefault()),
-                            getWSCUser(senderId).firstOrNull(),
+                            timestamp.toLocalDateTime(KTimeZone.UTC),
+                            getWSCUser(senderId).firstOrNull() ?:
+                            if (senderId == WSHandler.SERVER_MESSAGE_ID) WSHandler.server else null,
                             Pair(message, receiverId?.let { getWSCUser(it).firstOrNull() })
                         ))
                     }

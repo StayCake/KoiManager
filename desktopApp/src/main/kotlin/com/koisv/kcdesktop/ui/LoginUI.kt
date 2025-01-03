@@ -1,11 +1,14 @@
 package com.koisv.kcdesktop.ui
 
 import androidx.compose.desktop.ui.tooling.preview.Preview
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.AbsoluteRoundedCornerShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.*
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.VpnKey
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -16,36 +19,39 @@ import androidx.compose.ui.input.key.*
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavHostController
+import com.koisv.kcdesktop.Tools
+import com.koisv.kcdesktop.Tools.getConnected
 import com.koisv.kcdesktop.WSHandler
 import com.koisv.kcdesktop.WSHandler.autoLogin
 import com.koisv.kcdesktop.WSHandler.loggedInWith
 import com.koisv.kcdesktop.WSHandler.sendRegister
+import com.koisv.kcdesktop.WSHandler.sessionFailed
 import com.koisv.kcdesktop.WSHandler.sessionOpened
+import com.koisv.kcdesktop.WSHandler.wsSession
 import com.koisv.kcdesktop.config
+import com.koisv.kcdesktop.ui.MainUI.AlertSnackBar
 import com.koisv.kcdesktop.ui.MainUI.HeaderBar
 import com.koisv.kcdesktop.ui.MainUI.InputField
 import com.koisv.kcdesktop.ui.MainUI.ProgressAlert
-import com.koisv.kcdesktop.ui.MainUI.SlideInSnackbar
 import com.koisv.kcdesktop.ui.MainUI.checkboxPadding
 import com.koisv.kcdesktop.ui.MainUI.defaultPadding
 import com.koisv.kcdesktop.ui.MainUI.endTextPadding
-import com.koisv.kcdesktop.ui.MainUI.id
+import com.koisv.kcdesktop.ui.MainUI.idInput
+import com.koisv.kcdesktop.ui.MainUI.isRecovery
 import com.koisv.kcdesktop.ui.MainUI.isRegister
 import com.koisv.kcdesktop.ui.MainUI.keyFileExceed
 import com.koisv.kcdesktop.ui.MainUI.loginAlert
-import com.koisv.kcdesktop.ui.MainUI.nickname
-import com.koisv.kcdesktop.ui.MainUI.otp
+import com.koisv.kcdesktop.ui.MainUI.nickInput
+import com.koisv.kcdesktop.ui.MainUI.otpInput
 import com.koisv.kcdesktop.ui.MainUI.progressText
 import com.koisv.kcdesktop.ui.MainUI.progressVisible
 import com.koisv.kcdesktop.ui.MainUI.showSnackbar
 import com.koisv.kcdesktop.ui.MainUI.smallPadding
 import com.koisv.kcdesktop.ui.MainUI.snackbarText
-import com.koisv.kcdesktop.ui.Tools.getConnected
+import io.ktor.websocket.*
 import kotlinx.coroutines.DelicateCoroutinesApi
-import kotlinx.coroutines.async
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import java.io.File
 import java.io.FileOutputStream
 import kotlin.io.encoding.ExperimentalEncodingApi
 
@@ -79,7 +85,14 @@ object LoginUI {
         if (visible) {
             AlertDialog(
                 onDismissRequest = { /* Do nothing */ },
-                title = { Text(title) },
+                title = { Row {
+                    Icon(
+                        Icons.Default.VpnKey,
+                        contentDescription = "Account Alert",
+                        modifier = MainUI.iconTopPadding,
+                    )
+                    Text(title)
+                } },
                 text = { Text(text) },
                 buttons = {
                     Row (
@@ -93,18 +106,18 @@ object LoginUI {
                         MainUI.TransparentButton("로그인") {
                             isRegister = false
                             loginAlert = false
-                            buttonFor = if (sessionOpened) "로그인" else "재접속" }
+                            buttonFor = if (sessionOpened && !sessionFailed) "로그인" else "재접속" }
                         MainUI.TransparentButton("회원가입") {
-                            id = ""
+                            idInput = ""
                             isRegister = true
                             loginAlert = false
                             coroutineScope.launch { otpUIProgress() }
-                            buttonFor = if (sessionOpened) "회원가입" else "재접속" }
+                            buttonFor = if (sessionOpened && !sessionFailed) "회원가입" else "재접속" }
                     }
 
                 },
                 shape = RoundedCornerShape(8.dp),
-                backgroundColor = Color(100, 230, 100, 220),
+                backgroundColor = MainUI.backgroundColor2,
                 contentColor = Color.Black
             )
         }
@@ -113,13 +126,30 @@ object LoginUI {
     @OptIn(DelicateCoroutinesApi::class)
     @Composable
     @Preview
-    fun Authenticate(keys: List<File>, nav: NavHostController) {
-        val coroutineScope = rememberCoroutineScope()
+    fun Authenticate(nav: NavHostController) {
+        val keys = Tools.getKeys()
         val fcMan = LocalFocusManager.current
 
         MaterialTheme {
             Scaffold(
-                topBar = { HeaderBar("KoiChat Client [WSS]") }
+                topBar = {
+                    TopAppBar (
+                        contentColor = MainUI.nameColor,
+                        backgroundColor = MainUI.backgroundGolor3,
+                        elevation = 12.dp
+                    ) {
+                        Row (verticalAlignment = Alignment.CenterVertically) {
+                            Image(
+                                painter = Tools.painterResource("icon.webp"),
+                                contentDescription = "KoiChat",
+                                modifier = Modifier
+                                    .padding(7.dp, 0.dp, 12.dp)
+                                    .size(32.dp)
+                            )
+                            HeaderBar("KoiChat Client [WSS]")
+                        }
+                    }
+                }
             ) {
                 LoginAlert(
                     visible = loginAlert,
@@ -141,8 +171,8 @@ object LoginUI {
                                         true
                                     }
                                     Key.Enter -> {
-                                        if (!isRegister && id.isNotEmpty()) progressText = "로그인 중..."
-                                        else if (otp.isNotEmpty()) progressText = "가입 요청 중..."
+                                        if (!isRegister && idInput.isNotEmpty()) progressText = "로그인 중..."
+                                        else if (otpInput.isNotEmpty()) progressText = "가입 요청 중..."
                                         fcMan.clearFocus()
                                         progressVisible = true
                                         true
@@ -153,38 +183,42 @@ object LoginUI {
                     verticalArrangement = Arrangement.SpaceEvenly,
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    InputField(
-                        value = id,
-                        onValueChange = { id = it },
-                        label = "아이디",
-                        modifier = smallPadding,
-                        isEnable = inputEnabled,
-                        onDone = {
-                            if (!isRegister) {
-                                fcMan.clearFocus()
-                                progressText = "로그인 중..."
-                                progressVisible = true
-                            }
-                        }
-                    )
-                    if (isRegister) {
+                    if (!isRecovery) {
                         InputField(
-                            value = nickname,
-                            onValueChange = { nickname = it },
+                            value = idInput,
+                            onValueChange = { idInput = it },
+                            label = "아이디",
+                            modifier = smallPadding,
+                            isEnable = inputEnabled,
+                            onDone = {
+                                if (!isRegister) {
+                                    fcMan.clearFocus()
+                                    progressText = "로그인 중..."
+                                    progressVisible = true
+                                }
+                            }
+                        )
+                    }
+                    if (isRegister && !isRecovery) {
+                        InputField(
+                            value = nickInput,
+                            onValueChange = { nickInput = it },
                             label = "닉네임 [선택]",
                             modifier = smallPadding,
                             isEnable = inputEnabled
                         )
+                    }
+                    if (isRegister || isRecovery) {
                         InputField(
-                            value = otp,
+                            value = otpInput,
                             onValueChange = { if ( it.length <= 4 && it.all { it.isDigit() } )
-                                otp = it },
+                                otpInput = it },
                             label = "OTP",
                             modifier = smallPadding,
                             isEnable = inputEnabled,
                             isPassword = true,
                             onDone = {
-                                if (otp.isNotEmpty()) {
+                                if (otpInput.isNotEmpty()) {
                                     fcMan.clearFocus()
                                     progressText = "가입 요청 중..."
                                     progressVisible = true
@@ -205,13 +239,14 @@ object LoginUI {
                                     "OTP 다시 요청" -> "OTP 요청 중..."
                                     "재접속" -> "서버 연결 중..."
                                     "가입하기" -> "가입 요청 중..."
+                                    "계정 복구" -> "복구 중..."
                                     else -> "로그인 중..."
                                 }
                                 progressVisible = true
                             },
                             colors = ButtonDefaults.outlinedButtonColors(
-                                backgroundColor = Color(33, 114, 33, 220),
-                                contentColor = Color(195, 243, 195, 220)
+                                backgroundColor = MainUI.nameColor,
+                                contentColor = MainUI.backgroundGolor3
                             ),
                             shape = AbsoluteRoundedCornerShape(8.dp),
                             enabled = buttonEnabled
@@ -223,14 +258,42 @@ object LoginUI {
                             modifier = checkboxPadding
                         )
                         Text("자동 로그인", modifier = endTextPadding)
+                        if (!isRegister && !isRecovery) TextButton(
+                            onClick = {
+                                if (idInput.isNotEmpty()) {
+                                    buttonFor = "복구 시도 중..."
+                                    progressText = "복구 요청 중..."
+                                    progressVisible = true
+                                } else {
+                                    snackbarText = "복구할 아이디를 입력하세요."
+                                    showSnackbar = true
+                                }
+                            },
+                            enabled = inputEnabled,
+                            colors = ButtonDefaults.buttonColors(
+                                contentColor = MainUI.nameColor,
+                                backgroundColor = Color.Transparent
+                            ),
+                            modifier = endTextPadding
+                        ) { Text("계정 복구하기") }
                     }
                     ProgressAlert(visible = progressVisible, text = progressText)
                 }
                 Column(modifier = Modifier.fillMaxSize(), verticalArrangement = Arrangement.Bottom) {
-                    SlideInSnackbar(text = snackbarText, visible = showSnackbar)
+                    AlertSnackBar(text = snackbarText, visible = showSnackbar)
                     if (keyFileExceed)
-                        SlideInSnackbar(text = "키 파일이 너무 많습니다! 5개만 사용됩니다.", visible = keyFileExceed)
+                        AlertSnackBar(text = "키 파일이 너무 많습니다! 5개만 사용됩니다.", visible = keyFileExceed)
                 }
+            }
+        }
+        LaunchedEffect(sessionFailed) {
+            if (sessionFailed) {
+                buttonFor = "재접속"
+                inputEnabled = false
+                buttonEnabled = true
+                snackbarText = "서버 연결이 끊어졌습니다! 연결 상태를 확인하거나 관리자에게 문의하세요."
+                showSnackbar = true
+                progressVisible = false
             }
         }
 
@@ -250,22 +313,19 @@ object LoginUI {
 
         LaunchedEffect(progressVisible) {
             suspend fun loginNext() {
-                println("Login next")
-                val loginResult = keys.map { Pair(it, WSHandler.sendLogin(id, it)) }.also {
-                    println("Login result: $it")
-                }
+                val loginResult = keys.map { Pair(it, WSHandler.sendLogin(idInput, it)) }
+
+                WSHandler.logger.debug("Login result: {}", loginResult)
 
                 if (loginResult.any { it.second == 0 } ) {
                     val confingStream = FileOutputStream("config.ini")
                     config.setProperty("autoLogin", autoLogin.toString())
-                    config.setProperty("autoLoginId", id)
+                    config.setProperty("autoLoginId", idInput)
                     config.store(confingStream, "KoiChat Desktop Client Config")
                     confingStream.close()
 
-                    nav.navigate("chat") {
-                        launchSingleTop = true
-                        popUpTo("chat") { inclusive = true }
-                    }
+                    wsSession.send(Frame.Text("wsc:history"))
+                    nav.navigate("chat") { launchSingleTop = true }
                 }
                 snackbarText =
                     when {
@@ -273,16 +333,14 @@ object LoginUI {
                         loginResult.any { it.second == 2 } -> "로그인 실패! 이미 로그인 된 아이디입니다."
                         else -> "로그인 실패! 아이디, 키 파일을 점검하거나 관리자에게 문의 바랍니다."
                     }
-                if (!inputEnabled) inputEnabled = true
-                if (buttonFor == "접속 중...") buttonFor = "로그인"
                 showSnackbar = true
                 progressVisible = false
             }
 
             if (progressVisible) {
                 if (logout) {
-                    nickname = ""
-                    otp = ""
+                    nickInput = ""
+                    otpInput = ""
                     buttonFor = "대기 중..."
                     loginAlert = true
                     buttonEnabled = true
@@ -290,12 +348,9 @@ object LoginUI {
                     progressVisible = false
                 } else when (buttonFor) {
                     "가입하기" -> {
-                        val result = sendRegister(id, if (nickname.isNotBlank()) nickname else null, otp)
+                        val result = sendRegister(idInput, if (nickInput.isNotBlank()) nickInput else null, otpInput)
                         if (result == 0.toShort()) {
-                            nav.navigate("chat") {
-                                launchSingleTop = true
-                                popUpTo("chat") { inclusive = true }
-                            }
+                            nav.navigate("chat") { launchSingleTop = true }
                         }
                         when (result) {
                             99.toShort() -> snackbarText = "서버 연결 실패! 관리자에게 문의하거나 연결을 확인하세요."
@@ -308,9 +363,40 @@ object LoginUI {
                         showSnackbar = true
                         progressVisible = false
                     }
+                    "복구 시도 중..." -> {
+                        val request = WSHandler.requestRecovery(idInput)
+
+                        if (request) {
+                            isRecovery = true
+                            buttonFor = "계정 복구"
+                            snackbarText = "복구 요청 완료! OTP를 요청하세요."
+                            showSnackbar = true
+                        } else {
+                            snackbarText = "복구 요청 실패! 아이디를 확인하거나 관리자에게 문의하세요."
+                            showSnackbar = true
+                        }
+                        progressVisible = false
+                    }
+                    "계정 복구" -> {
+                        val request = WSHandler.sendRecovery(idInput, otpInput)
+                        if (request) {
+                            nav.navigate("chat") { launchSingleTop = true }
+                            wsSession.send(Frame.Text("wsc:history"))
+                            snackbarText =
+                                "복구 완료! 다시 만나서 반갑습니다, ${loggedInWith?.nickname ?: loggedInWith?.id}님."
+                        } else {
+                            otpInput = ""
+                            buttonFor = "로그인"
+                            snackbarText = "복구 실패! OTP를 확인하거나 관리자에게 문의하세요."
+                        }
+
+                        isRecovery = false
+                        progressVisible = false
+                        showSnackbar = true
+                    }
                     "재접속", "접속 중..." -> {
                         progressText = "서버 연결 중..."
-                        var connected = coroutineScope.async { getConnected() }.await()
+                        var connected = getConnected()
                         if (connected) {
                             when {
                                 autoLogin -> {
@@ -322,19 +408,19 @@ object LoginUI {
                                     }
                                     else {
                                         loginAlert = false
-                                        id = WSHandler.autoLoginId
-                                        coroutineScope.launch { loginNext() }
+                                        idInput = WSHandler.autoLoginId
+                                        loginNext()
                                     }
                                     showSnackbar = true
                                 }
                                 isRegister -> otpUIProgress()
                                 else -> {
-                                    buttonFor = "로그인"
-                                    inputEnabled = true
                                     if (buttonFor == "재접속") {
                                         snackbarText = "서버 연결 완료! 로그인 하세요."
                                         showSnackbar = true
                                     }
+                                    buttonFor = "로그인"
+                                    inputEnabled = true
                                     progressVisible = false
                                 }
                             }
@@ -347,12 +433,12 @@ object LoginUI {
                         progressVisible = false
                     }
                     "OTP 다시 요청" -> {
-                        coroutineScope.launch { otpUIProgress() }
+                        otpUIProgress()
                         progressVisible = false
                     }
                     "로그인" -> {
                         progressText = "로그인 중..."
-                        coroutineScope.launch { loginNext() }
+                        loginNext()
                     }
                 }
             }
